@@ -1,0 +1,19 @@
+# 1. Comportamento di default: auto-rileva il testo e forza i ritorni a capo in stile Linux (LF)
+* text=auto eol=lf
+
+# 2. Regole specifiche per i file di testo comuni
+*.java text
+*.md text
+*.properties text
+*.xml text
+*.txt text
+
+# 3. REGOLA CRITICA PER GRADLE: Assicura che gli script funzionino sui rispettivi OS
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+
+# 4. Dichiara esplicitamente i file binari per evitare corruzioni
+*.jar binary
+*.pdf binary
+*.png binary
+*.jpg binary
