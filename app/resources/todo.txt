@@ -1,0 +1,7 @@
+- ER
+- concettuale
+- logica
+- domain 
+- DB
+
+- latex relazione
