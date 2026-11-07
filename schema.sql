@@ -181,7 +181,7 @@ CREATE TABLE PREVENTIVO (
     data_evento DATE NOT NULL,
     dipendente_cf VARCHAR(16) NOT NULL,
     data_emissione DATE NOT NULL,
-    data_scadenza DATE NOT NULL,
+    data_scadenza DATE,
     importo DECIMAL(10,2) NOT NULL,
     descrizione VARCHAR(255) NOT NULL,
     stato VARCHAR(20) NOT NULL,
@@ -281,14 +281,16 @@ CREATE TABLE ATTIVITA_CHECKLIST (
 );
 
 -- -----------------------------------------------------------------------------
--- 5. OSPITI, PARTECIPAZIONI, LISTA NOZZE E QUOTE
+-- 5. OSPITI, PARTECIPAZIONI, LISTA NOZZE E QUOTE REGALO
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE INVITATO (
     codice_fiscale VARCHAR(16) NOT NULL,
     relazione VARCHAR(50) NOT NULL,
+    tipologia_bomboniera VARCHAR(50),
     PRIMARY KEY (codice_fiscale),
-    FOREIGN KEY (codice_fiscale) REFERENCES PERSONA (codice_fiscale)
+    FOREIGN KEY (codice_fiscale) REFERENCES PERSONA (codice_fiscale),
+    FOREIGN KEY (tipologia_bomboniera) REFERENCES BOMBONIERA (tipologia)
 );
 
 CREATE TABLE PARTECIPAZIONE (
@@ -301,12 +303,10 @@ CREATE TABLE PARTECIPAZIONE (
     trasporto CHAR(1) NOT NULL,
     note VARCHAR(255),
     tavolo_nome_numero VARCHAR(50),
-    bomboniera_tipologia VARCHAR(50),
     PRIMARY KEY (codice_fiscale, username_coppia, data_evento),
     FOREIGN KEY (codice_fiscale) REFERENCES INVITATO (codice_fiscale),
     FOREIGN KEY (username_coppia, data_evento) REFERENCES EVENTO (username_coppia, data),
-    FOREIGN KEY (username_coppia, data_evento, tavolo_nome_numero) REFERENCES TAVOLO (username_coppia, data_evento, nome_numero),
-    FOREIGN KEY (bomboniera_tipologia) REFERENCES BOMBONIERA (tipologia)
+    FOREIGN KEY (username_coppia, data_evento, tavolo_nome_numero) REFERENCES TAVOLO (username_coppia, data_evento, nome_numero)
 );
 
 CREATE TABLE LISTA_NOZZE (
@@ -333,18 +333,19 @@ CREATE TABLE REGALO (
     FOREIGN KEY (username_coppia, data_evento) REFERENCES LISTA_NOZZE (username_coppia, data_evento)
 );
 
-CREATE TABLE PRENOTAZIONE (
+CREATE TABLE QUOTA_REGALO (
     codice_fiscale VARCHAR(16) NOT NULL,
     username_coppia VARCHAR(50) NOT NULL,
     data_evento DATE NOT NULL,
-    descrizione_regalo VARCHAR(100) NOT NULL,
     data_ora TIMESTAMP NOT NULL,
-    quota DECIMAL(10,2) NOT NULL,
+    importo DECIMAL(10,2) NOT NULL,
     messaggio_auguri VARCHAR(255),
     metodo_pagamento VARCHAR(50) NOT NULL,
     stato VARCHAR(20) NOT NULL,
-    PRIMARY KEY (codice_fiscale, username_coppia, data_evento, descrizione_regalo, data_ora),
-    FOREIGN KEY (codice_fiscale, username_coppia, data_evento) REFERENCES PARTECIPAZIONE (codice_fiscale, username_coppia, data_evento),
+    descrizione_regalo VARCHAR(100),
+    PRIMARY KEY (codice_fiscale, username_coppia, data_evento, data_ora),
+    FOREIGN KEY (codice_fiscale) REFERENCES INVITATO (codice_fiscale),
+    FOREIGN KEY (username_coppia, data_evento) REFERENCES EVENTO (username_coppia, data),
     FOREIGN KEY (username_coppia, data_evento, descrizione_regalo) REFERENCES REGALO (username_coppia, data_evento, descrizione)
 );
 
@@ -370,12 +371,15 @@ CREATE TABLE APPUNTAMENTO (
     username_coppia VARCHAR(50) NOT NULL,
     data_ora TIMESTAMP NOT NULL,
     dipendente_cf VARCHAR(16) NOT NULL,
+    categoria_assenza VARCHAR(50),
     luogo_modalita VARCHAR(100) NOT NULL,
     durata_minuti INTEGER NOT NULL,
     resoconto VARCHAR(255),
+    stato VARCHAR(20) NOT NULL,
     PRIMARY KEY (username_coppia, data_ora),
     FOREIGN KEY (username_coppia) REFERENCES COPPIA (username),
-    FOREIGN KEY (dipendente_cf) REFERENCES DIPENDENTE (codice_fiscale)
+    FOREIGN KEY (dipendente_cf) REFERENCES DIPENDENTE (codice_fiscale),
+    FOREIGN KEY (categoria_assenza) REFERENCES MOTIVO_ASSENZA (categoria)
 );
 
 CREATE TABLE RECENSIONE (

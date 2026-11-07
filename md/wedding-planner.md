@@ -42,6 +42,7 @@ erDiagram
         date data_fine
         string tipo
         string stato
+        string categoria_assenza FK
     }
     ASSEGNAZIONE_DIPENDENTE {
         string username_coppia PK "FK"
@@ -67,6 +68,14 @@ erDiagram
         decimal prezzo_affitto
         string servizi_inclusi
     }
+    SVOLGIMENTO_EVENTO {
+        string username_coppia PK "FK"
+        date data_evento PK "FK"
+        string nome_location PK "FK"
+        string indirizzo_location PK "FK"
+        time orario_inizio
+        time orario_fine
+    }
     CATEGORIA_FORNITORE {
         string nome_categoria PK
         string descrizione
@@ -79,6 +88,7 @@ erDiagram
         string zona_operativita
         decimal valutazione_interna
         boolean attivo
+        string nome_categoria FK
     }
     COLLABORAZIONE {
         string partita_iva PK "FK"
@@ -91,8 +101,9 @@ erDiagram
     PREVENTIVO {
         string partita_iva PK "FK"
         int numero_preventivo PK
-        string username_coppia "FK"
-        date data_evento "FK"
+        string username_coppia FK
+        date data_evento FK
+        string dipendente_cf FK
         date data_emissione
         date data_scadenza
         decimal importo
@@ -109,9 +120,15 @@ erDiagram
         string stato_pagamento
         string penali
     }
+    BOMBONIERA {
+        string tipologia PK
+        string descrizione
+        string target
+    }
     INVITATO {
         string codice_fiscale PK "FK"
         string relazione
+        string tipologia_bomboniera FK
     }
     PARTECIPAZIONE {
         string codice_fiscale PK "FK"
@@ -122,6 +139,7 @@ erDiagram
         string preferenza_menu
         boolean trasporto
         string note
+        string tavolo_nome_numero FK
     }
     TAVOLO {
         string username_coppia PK "FK"
@@ -129,11 +147,6 @@ erDiagram
         string nome_numero PK
         int capienza
         string posizione
-    }
-    BOMBONIERA {
-        string tipologia PK
-        string descrizione
-        string target
     }
     TIMELINE {
         string username_coppia PK "FK"
@@ -152,6 +165,8 @@ erDiagram
         string stato
         string nota_staff
         string nota_coppia
+        string dipendente_cf FK
+        string partita_iva_fornitore FK
     }
     TEMPLATE_CHECKLIST {
         string nome_template PK
@@ -169,6 +184,7 @@ erDiagram
     CHECKLIST {
         string username_coppia PK "FK"
         date data_evento PK "FK"
+        string nome_template FK
         string note_generali
     }
     ATTIVITA_CHECKLIST {
@@ -181,6 +197,7 @@ erDiagram
         string priorita
         string fase
         string stato
+        string dipendente_cf FK
     }
     LISTA_NOZZE {
         string username_coppia PK "FK"
@@ -200,21 +217,22 @@ erDiagram
         string tipologia
         string tipo_frazionamento
     }
-    PRENOTAZIONE {
+    QUOTA_REGALO {
         string codice_fiscale PK "FK"
         string username_coppia PK "FK"
         date data_evento PK "FK"
-        string descrizione_regalo PK "FK"
         datetime data_ora PK
-        decimal quota
+        decimal importo
         string messaggio_auguri
         string metodo_pagamento
         string stato
+        string descrizione_regalo FK
     }
     COMUNICAZIONE {
         string username_coppia PK "FK"
         datetime data_ora PK
         string mittente PK
+        string dipendente_cf FK
         string oggetto
         string contenuto
         string argomento
@@ -223,9 +241,12 @@ erDiagram
     APPUNTAMENTO {
         string username_coppia PK "FK"
         datetime data_ora PK
+        string dipendente_cf FK
+        string categoria_assenza FK
         string luogo_modalita
         int durata_minuti
         string resoconto
+        string stato
     }
     RECENSIONE {
         string username_coppia PK "FK"
@@ -253,55 +274,62 @@ erDiagram
     COPPIA }|--|| PERSONA : "coniuge 1"
     COPPIA }|--|| PERSONA : "coniuge 2"
 
-    %% Relazioni Staff e Ruoli
+    %% Staff, Ruoli e Assenze
     DIPENDENTE ||--o{ RUOLO_DIPENDENTE : "abilitato a"
     RUOLO ||--o{ RUOLO_DIPENDENTE : "assegnato tramite"
-    DIPENDENTE ||--o{ DISPONIBILITA : "ha"
-    DISPONIBILITA }o--o| MOTIVO_ASSENZA : "motivata da"
+    DIPENDENTE ||--o{ DISPONIBILITA : "ha calendario"
+    DISPONIBILITA }o--o| MOTIVO_ASSENZA : "giustificata da"
+    DIPENDENTE ||--o{ MOTIVO_ASSENZA : "ha per assenza"
 
-    %% Relazioni Assegnazione e Organizzazione
-    COPPIA ||--o{ ASSEGNAZIONE_DIPENDENTE : "ha storico"
-    DIPENDENTE ||--o{ ASSEGNAZIONE_DIPENDENTE : "assegnato a"
+    %% Incarichi e Contatti
+    COPPIA ||--o{ ASSEGNAZIONE_DIPENDENTE : "ha storico planner"
+    DIPENDENTE ||--o{ ASSEGNAZIONE_DIPENDENTE : "preso in carico da"
     COPPIA ||--o{ EVENTO : "organizza"
-    COPPIA ||--o{ COMUNICAZIONE : "scambia"
+    COPPIA ||--o{ COMUNICAZIONE : "riceve"
     DIPENDENTE ||--o{ COMUNICAZIONE : "invia"
     COPPIA ||--o{ APPUNTAMENTO : "fissa"
     DIPENDENTE ||--o{ APPUNTAMENTO : "conduce"
+    APPUNTAMENTO }o--o| MOTIVO_ASSENZA : "annullato per"
 
-    %% Relazioni Logistica e Fornitori
-    EVENTO }o--o{ LOCATION : "si svolge in"
-    FORNITORE }o--|| CATEGORIA_FORNITORE : "appartiene a"
-    FORNITORE ||--o{ COLLABORAZIONE : "ha storico"
+    %% Location e Logistica
+    EVENTO ||--o{ SVOLGIMENTO_EVENTO : "occupa"
+    LOCATION ||--o{ SVOLGIMENTO_EVENTO : "ospita"
+    EVENTO ||--o{ TAVOLO : "dispone"
+
+    %% Fornitori e Categorie
+    CATEGORIA_FORNITORE ||--o{ FORNITORE : "classifica"
+    FORNITORE ||--o{ COLLABORAZIONE : "ha storico convenzioni"
     FORNITORE ||--o{ PREVENTIVO : "emette"
     EVENTO ||--o{ PREVENTIVO : "richiede (1 a N)"
+    DIPENDENTE ||--o{ PREVENTIVO : "cura trattativa"
     PREVENTIVO ||--o| CONTRATTO : "genera"
 
     %% Timeline
-    EVENTO ||--|| TIMELINE : "ha"
+    EVENTO ||--|| TIMELINE : "ha regia"
     TIMELINE ||--o{ ATTIVITA_TIMELINE : "composta da"
-    DIPENDENTE ||--o{ ATTIVITA_TIMELINE : "responsabile di"
+    DIPENDENTE ||--o{ ATTIVITA_TIMELINE : "coordina"
+    FORNITORE ||--o{ ATTIVITA_TIMELINE : "ingaggiato in"
 
     %% Checklist e Template
-    EVENTO ||--|| CHECKLIST : "ha"
-    CHECKLIST ||--o{ ATTIVITA_CHECKLIST : "composta da"
-    DIPENDENTE ||--o{ ATTIVITA_CHECKLIST : "responsabile di"
     TEMPLATE_CHECKLIST ||--o{ VOCE_TEMPLATE : "composto da"
-    TEMPLATE_CHECKLIST ||--o{ CHECKLIST : "istanzia"
-    VOCE_TEMPLATE ||--o{ ATTIVITA_CHECKLIST : "genera"
+    TEMPLATE_CHECKLIST ||--o{ CHECKLIST : "istanzia modello"
+    EVENTO ||--|| CHECKLIST : "ha operativa"
+    CHECKLIST ||--o{ ATTIVITA_CHECKLIST : "composta da"
+    DIPENDENTE ||--o{ ATTIVITA_CHECKLIST : "supervisiona"
 
-    %% Lista Nozze
-    EVENTO ||--|| LISTA_NOZZE : "ha"
-    LISTA_NOZZE ||--o{ REGALO : "composta da"
-    EVENTO ||--o{ TAVOLO : "dispone"
+    %% Invitati, Partecipazioni, Tavoli e Bomboniere
+    INVITATO ||--o{ PARTECIPAZIONE : "puo avere rsvp"
+    EVENTO ||--o{ PARTECIPAZIONE : "registra presenza"
+    PARTECIPAZIONE }o--o| TAVOLO : "assegnata a seduta"
+    INVITATO }o--o| BOMBONIERA : "riceve omaggio"
 
-    %% Partecipazione e Quote
-    INVITATO ||--o{ PARTECIPAZIONE : "partecipa tramite"
-    EVENTO ||--o{ PARTECIPAZIONE : "registra"
-    PARTECIPAZIONE }o--o| TAVOLO : "assegnata a"
-    PARTECIPAZIONE }o--o| BOMBONIERA : "associata a"
-    PARTECIPAZIONE ||--o{ PRENOTAZIONE : "versa quota"
-    REGALO ||--o{ PRENOTAZIONE : "riceve quota"
+    %% Doni, Lista Nozze e Quote Indipendenti
+    EVENTO ||--|| LISTA_NOZZE : "ha registro doni"
+    LISTA_NOZZE ||--o{ REGALO : "composta da articoli"
+    INVITATO ||--o{ QUOTA_REGALO : "versa donazione"
+    EVENTO ||--o{ QUOTA_REGALO : "riceve quota per evento"
+    REGALO ||--o{ QUOTA_REGALO : "destinata specificamente a"
 
-    %% Portfolio
-    EVENTO ||--o| RECENSIONE : "riceve"
-    EVENTO ||--o{ FOTO : "documentato da"
+    %% Portfolio Post-Evento
+    EVENTO ||--o| RECENSIONE : "valutato da"
+    EVENTO ||--o{ FOTO : "documentato da scatti"

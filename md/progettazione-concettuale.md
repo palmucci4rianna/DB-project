@@ -268,7 +268,7 @@ Come prescritto dalla metodologia accademica di Basi di Dati, i requisiti espres
   * `Principale`: booleano `(1,1)` (indica il ruolo primario contrattuale)
 
 #### `MOTIVO_ASSENZA`
-* **Tipo:** Entità Forte.
+* **Tipo:** Entità Forte (causale codificata collegata sia a DIPENDENTE/DISPONIBILITA per le assenze lavorative, sia ad APPUNTAMENTO per giustificare incontri annullati o mancati).
 * **Identificatore Naturale:** `Categoria` (ferie, malattia, congedo, permessi, dimissioni).
 * **Attributi:**
   * `Categoria`: stringa `(1,1)` — **Identificatore**
@@ -300,7 +300,7 @@ Come prescritto dalla metodologia accademica di Basi di Dati, i requisiti espres
 ### Gruppo 3: Fornitori, Preventivi (1:N) e Contratti
 
 #### `CATEGORIA_FORNITORE`
-* **Tipo:** Entità Forte.
+* **Tipo:** Entità Forte (settore merceologico con associazione diretta 1:N verso FORNITORE).
 * **Identificatore Naturale:** `NomeCategoria` (catering, foto/video, fiori, musica, trasporti, abiti, cake design, celebrante).
 * **Attributi:**
   * `NomeCategoria`: stringa `(1,1)` — **Identificatore**
@@ -377,7 +377,7 @@ Come prescritto dalla metodologia accademica di Basi di Dati, i requisiti espres
   * `Posizione`: stringa `(1,1)`
 
 #### `BOMBONIERA`
-* **Tipo:** Entità Forte.
+* **Tipo:** Entità Forte (tipologia di dono destinata direttamente agli INVITATI).
 * **Identificatore Naturale:** `Tipologia` (testimoni, genitori, ospiti adulti, bambini).
 * **Attributi:**
   * `Tipologia`: stringa `(1,1)` — **Identificatore**
@@ -577,8 +577,10 @@ La coppia non è una singola persona fisica né una specializzazione di Persona,
 
 1. **A Livello Concettuale:**
    - L'associazione `CONIUGI` unisce `COPPIA` e `PERSONA`.
-   - Cardinalità per `COPPIA`: `(2, 2)` $ightarrow$ Ogni coppia è costituita da esattamente 2 persone fisiche.
-   - Cardinalità per `PERSONA`: `(0, 1)` $ightarrow$ Una persona può far parte al più di una coppia committente attiva (o `(0, N)` se si ammette la storicizzazione di unioni distinte nel tempo).
+   - Cardinalità per `COPPIA`: `(2, 2)` $
+ightarrow$ Ogni coppia è costituita da esattamente 2 persone fisiche.
+   - Cardinalità per `PERSONA`: `(0, 1)` $
+ightarrow$ Una persona può far parte al più di una coppia committente attiva (o `(0, N)` se si ammette la storicizzazione di unioni distinte nel tempo).
    - L'associazione definisce il ruolo: `RuoloConiuge` ('Coniuge 1', 'Coniuge 2').
 2. **A Livello Logico Relazionale (Traduzione):**
    - Poiché la cardinalità verso Persona è fissa a 2, la soluzione ottimale è inserire direttamente nella relazione `COPPIA` le due chiavi esterne referenzianti `PERSONA`:
