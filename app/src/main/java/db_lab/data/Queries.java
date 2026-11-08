@@ -4,7 +4,7 @@ public final class Queries {
 
     public static final String TAGS_FOR_PRODUCT =
         """
-        SELECT t.name
+        SELECT t.name AS tag_name
         FROM TAG t
         JOIN TAGGED tg ON tg.tag_name = t.name
         WHERE tg.product_code = ?
@@ -30,7 +30,7 @@ public final class Queries {
         """
         SELECT code, name, description
         FROM PRODUCT
-        WHERE name LIKE ?
+        WHERE code = ?
         ORDER BY name
         """;
 }

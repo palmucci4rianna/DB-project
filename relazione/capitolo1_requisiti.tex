@@ -1,0 +1,86 @@
+\chapter{Analisi dei Requisiti}
+
+\section{Introduzione e Scenario di Dominio}
+Il presente progetto ha come obiettivo la progettazione e lo sviluppo di un sistema informativo integrato per una prestigiosa agenzia di \textit{Wedding Planning \& Event Design} (denominata convenzionalmente \textbf{Wedding Planner Studio}). 
+
+L'organizzazione di un matrimonio rappresenta un processo ad elevatissima complessità gestionale, logistica ed economica. L'agenzia coordina simultaneamente decine di matrimoni in diverse fasi di avanzamento, gestendo le relazioni con le coppie committenti, un ampio catalogo di fornitori partner convenzionati (catering, floral designer, fotografi, musicisti, atelier), la contrattualistica, il piano finanziario con monitoraggio degli scostamenti di budget, la regia oraria dell'evento (timeline), le checklist operative standardizzate e la disposizione degli ospiti ai tavoli (table planner con gestione delle profilassi alimentari). A completare il dominio vi sono la gestione della lista nozze digitale con quote regalo monetarie e la raccolta di recensioni e portfolio fotografico a conclusione dell'evento.
+
+\section{Intervista con il Committente}
+Di seguito si riporta la trascrizione del colloquio preliminare intercorso con la titolare e Lead Planner dell'agenzia:
+
+\begin{quote}
+\small
+\textbf{[Riga 1]} \textit{«Gestiamo la pianificazione completa di matrimoni di alto profilo. Quando una coppia si rivolge a noi, raccogliamo i dati di entrambi i futuri sposi, la data indicativa desiderata e un budget di massima. Ad ogni coppia assegniamo un wedding planner del nostro staff interno che li seguirà dall'inizio alla fine, anche se nel corso dei mesi può capitare di dover sostituire il planner assegnato per ferie, maternità o cambi di carico di lavoro; vogliamo quindi tenere traccia di chi ha seguito la coppia e quando.}
+
+\textbf{[Riga 7]} \textit{All'apertura ufficiale del matrimonio definiamo il budget effettivo stanziato, il numero stimato di invitati, il rito (religioso, civile o simbolico) e il tema scenografico. Un matrimonio può tenersi in una o più location (ad esempio cerimonia in pieve antica e ricevimento serale in una villa d'epoca), specificando la fascia oraria di utilizzo.}
+
+\textbf{[Riga 12]} \textit{Durante l'anno richiediamo vari preventivi ai nostri fornitori di fiducia, suddivisi per settore (catering, foto, musica, fiori, abiti). Quando gli sposi scelgono una proposta, il preventivo viene approvato e stipuliamo un contratto vincolante con importo concordato, acconto versato e scadenze di pagamento. Dobbiamo sempre monitorare che la somma dei contratti fornitore e dei canoni delle location non sfori il budget stabilito.}
+
+\textbf{[Riga 17]} \textit{Per non dimenticare nulla, all'apertura del matrimonio generiamo automaticamente una checklist operativa calcolata sul tipo di cerimonia scelta: ogni compito ha una scadenza calcolata a ritroso rispetto alla data delle nozze (es. 180 giorni prima la prova abito, 30 giorni prima la stampa dei libretti messa) e vogliamo registrare quando ciascuna voce viene effettivamente completata per analizzare eventuali ritardi.}
+
+\textbf{[Riga 22]} \textit{Nel giorno delle nozze, il coordinatore sul campo segue una regia oraria minuto per minuto: dalla preparazione degli sposi al taglio della torta e open bar, associando a ciascun momento il fornitore o il membro dello staff incaricato.}
+
+\textbf{[Riga 26]} \textit{Un aspetto delicatissimo è la gestione degli invitati e della sala. Riceviamo le conferme di presenza (RSVP) e dobbiamo registrare con precisione intolleranze, allergie alimentari e menù speciali (vegano, celiaco, bambini). I tavoli della sala hanno una capienza massima e una disposizione specifica: nessun invitato che non abbia confermato la presenza può occupare un posto al tavolo.}
+
+\textbf{[Riga 31]} \textit{Offriamo inoltre una lista nozze online: la coppia può inserire regali specifici (interi o frazionabili in quote libere) oppure richiedere semplicemente quote libere destinate al viaggio di nozze con bonifico su un IBAN dedicato. Soltanto gli invitati del matrimonio possono effettuare donazioni e lasciare un messaggio di auguri.}
+
+\textbf{[Riga 36]} \textit{Infine, a matrimonio concluso, raccogliamo il giudizio e la recensione degli sposi con una valutazione numerica e archiviamo le fotografie ufficiali più significative per arricchire il nostro portfolio aziendale.»}
+\end{quote}
+
+\section{Rilevamento delle Ambiguità e Normalizzazione}
+L'analisi del testo dell'intervista ha evidenziato diverse ambiguità terminologiche e criticità concettuali, risolte nella Tabella~\ref{tab:ambiguita}.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l p{3.2cm} p{5.5cm} X}
+\toprule
+\textbf{Riga} & \textbf{Termine Originale} & \textbf{Ambiguità / Criticità Riscontrata} & \textbf{Decisione e Termine Normalizzato} \\
+\midrule
+R. 1 & \textit{Coppia / Futuri sposi} & Ambiguità sull'identificazione: due persone fisiche distinte ma un unico soggetto contrattuale. & Entità \texttt{COPPIA} con identificatore naturale sintetico (\texttt{username}) legata a due entità \texttt{PERSONA} tramite FK distinte. \\
+\addlinespace
+R. 4 & \textit{Sostituire il planner} & Rischio di sovrascrittura: la perdita dello storico impedirebbe statistiche sulla produttività. & Reificazione $N:M$ tramite entità \texttt{ASSEGNAZIONE\_DIPENDENTE} con date inizio/fine e flag \texttt{attiva}. \\
+\addlinespace
+R. 8 & \textit{Location multiple} & Cardinalità tra evento e location: un evento può occupare più sedi in fasce orarie distinte. & Relazione $N:M$ reificata in \texttt{SVOLGIMENTO\_EVENTO} con attributi \texttt{fascia\_oraria} e \texttt{tipo\_utilizzo}. \\
+\addlinespace
+R. 12 & \textit{Preventivo e Contratto} & Sovrapposizione semantica tra proposta economica e vincolo legale formalizzato. & Entità distinte: \texttt{PREVENTIVO} debole da Fornitore (1:N verso Evento) e \texttt{CONTRATTO} 1:1 dal preventivo accettato. \\
+\addlinespace
+R. 18 & \textit{Checklist da cerimonia} & Rischio di duplicazione statica di task standard per ogni singolo matrimonio. & Pattern a 3 livelli: \texttt{TEMPLATE\_CHECKLIST} $\rightarrow$ \texttt{VOCE\_TEMPLATE} $\rightarrow$ \texttt{ATTIVITA\_CHECKLIST} istanziata. \\
+\addlinespace
+R. 27 & \textit{Conferma e Posto tavolo} & Incoerenza logica: assegnare un posto al tavolo a chi non ha ancora confermato la partecipazione. & Vincolo di integrità: lo stato RSVP risiede in \texttt{PARTECIPAZIONE}; assegnazione tavolo vincolata a \texttt{stato='CONFERMATO'}. \\
+\addlinespace
+R. 32 & \textit{Lista nozze e Donazioni} & Accoppiamento rigido: impossibilità di donare quote monetarie generiche senza scegliere un regalo. & Entità \texttt{QUOTA\_REGALO} vincolata a \texttt{PARTECIPAZIONE} con \texttt{descrizione\_regalo} facoltativa (quota libera ammessa). \\
+\bottomrule
+\end{tabularx}
+\caption{Tabella di risoluzione delle ambiguità e normalizzazione dei termini.}
+\label{tab:ambiguita}
+\end{table}
+
+\section{Glossario dei Termini}
+\begin{itemize}[leftmargin=*,noitemsep]
+    \item \textbf{COPPIA:} Soggetto contrattuale committente, identificato univocamente da uno username condiviso, collegato a due persone fisiche distinte (\texttt{cf\_coniuge1}, \texttt{cf\_coniuge2}).
+    \item \textbf{EVENTO:} Il progetto nuziale specifico, identificato dalla coppia committente e dalla data fissata per le nozze.
+    \item \textbf{DIPENDENTE:} Membro dello staff aziendale (wedding planner, assistente, coordinatore) specializzazione di Persona.
+    \item \textbf{PREVENTIVO:} Proposta economica emessa da un fornitore convenzionato per un determinato matrimonio.
+    \item \textbf{CONTRATTO:} Accordo formale vincolante stipulato a seguito dell'accettazione del preventivo, contenente importo concordato e acconto.
+    \item \textbf{TIMELINE:} Sequenza cronologica oraria dei momenti chiave del giorno del matrimonio (regia on-site).
+    \item \textbf{PARTECIPAZIONE:} Relazione tra persona invitata e specifico matrimonio, tracciante stato RSVP, allergie alimentari e tavolo assegnato.
+    \item \textbf{QUOTA\_REGALO:} Transazione monetaria di contributo alla lista nozze effettuata da un invitato all'evento.
+\end{itemize}
+
+\section{Specifiche Funzionali e Operazioni di Sistema}
+Il sistema informativo supporta due tipologie di transazioni:
+\begin{enumerate}
+    \item \textbf{Operazioni Interattive (OLTP):} Registrazione anagrafica coppie, inserimento eventi, istanziazione checklist, stipula contratti fornitori, seating planning e assegnazione tavoli con vincoli di capienza, inserimento quote regalo.
+    \item \textbf{Interrogazioni Direzionali e Analitiche (OLAP):}
+    \begin{itemize}[noitemsep]
+        \item \textbf{STAT-01:} Fornitori maggiormente contrattualizzati per categoria merceologica e spesa media.
+        \item \textbf{STAT-02:} Monitoraggio scostamento budget (Variance Analysis) su tutti i matrimoni attivi.
+        \item \textbf{STAT-03:} Tasso di conversione commerciale dei preventivi in contratti per fornitore.
+        \item \textbf{STAT-04:} Analisi saturazione e capienza dei tavoli del ricevimento.
+        \item \textbf{STAT-05:} Monitoraggio avanzamento checklist operativa e tassi di ritardo per fase temporale.
+        \item \textbf{STAT-06:} Distribuzione regali e stato di progressione economica della lista nozze.
+        \item \textbf{STAT-07:} Profilassi allergenica e statistiche preferenze menù speciali per catering.
+        \item \textbf{STAT-08:} Tracciamento ospiti ricorrenti e generosità complessiva delle donazioni effettuate.
+    \end{itemize}
+\end{enumerate}

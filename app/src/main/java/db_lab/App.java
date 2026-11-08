@@ -1,27 +1,46 @@
 package db_lab;
 
 import db_lab.data.DAOUtils;
-import db_lab.model.Model;
-import java.sql.SQLException;
+import db_lab.ui.MainWindow;
+import java.sql.Connection;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 
 public final class App {
 
-    public static void main(String[] args) throws SQLException {
-        // If you want to get a feel of the application before having implemented
-        // all methods, you can pass the controller a mocked model instead:
-        //
-        // var model = Model.mock();
-        var connection = DAOUtils.localMySQLConnection("tessiland", "ariannapalmucci", "12345678");
-        var model = Model.fromConnection(connection);
-        var view = new View(() -> {
-            // We want to make sure we close the connection when we're done
-            // with our application.
+    public static void main(String[] args) {
+        // Imposta Look & Feel nativo di sistema
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ignored) {}
+
+        // Tenta la connessione al database 'wedding_planner'
+        Connection connection = null;
+        try {
+            connection = DAOUtils.getWeddingPlannerConnection();
+            System.out.println("✓ Connessione al database 'wedding_planner' su localhost:3306 stabilita con successo.");
+        } catch (Exception e) {
+            System.err.println("✗ Impossibile connettersi al database 'wedding_planner': " + e.getMessage());
+            // Mostra messaggio di errore grafico se disponibile
             try {
-                connection.close();
+                JOptionPane.showMessageDialog(
+                    null,
+                    "Impossibile connettersi a MySQL (database 'wedding_planner').\n\n" +
+                    "Dettaglio: " + e.getMessage() + "\n\n" +
+                    "Assicurati che il servizio MySQL sia avviato su localhost:3306\n" +
+                    "e che lo schema 'wedding_planner' sia stato inizializzato.",
+                    "Errore di Connessione al Database",
+                    JOptionPane.ERROR_MESSAGE
+                );
             } catch (Exception ignored) {}
+            return;
+        }
+
+        final Connection finalConn = connection;
+        SwingUtilities.invokeLater(() -> {
+            var window = new MainWindow(finalConn);
+            window.setVisible(true);
         });
-        var controller = new Controller(model, view);
-        view.setController(controller);
-        controller.userRequestedInitialPage();
     }
 }

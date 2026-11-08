@@ -290,6 +290,82 @@ $$\\Delta \\text{Costo} = 273.600 - 14.400 = \\mathbf{+259.200 \\text{ accessi r
 
 ---
 
+### Ridondanza 2: Attributo `costo_totale_impegnato` in `EVENTO` (Candidato SCARTATO)
+
+- **Dato derivabile:** Somma dei contratti stipulati con i fornitori e dei canoni delle location:
+  $$\text{CostoTotaleImpegnato} = \sum_{c \in \text{CONTRATTO}} c.\text{importo\_concordato} + \sum_{l \in \text{LOCATION}} l.\text{costo\_affitto}$$
+- **Operazioni impattate:**
+  - $OP_C$ (Scrittura): Stipula o modifica contratto fornitore / variazione location ($F_C = 180 \text{ volte/anno}$).
+  - $OP_D$ (Lettura): Esecuzione report budget settimanale STAT-02 ($F_D = 48 \text{ volte/anno}$) e consultazioni direzionali saltuarie ($F_{D2} = 100 \text{ volte/anno}$), totale $F_{\text{read}} = 148 \text{ volte/anno}$.
+
+#### Calcolo Comparativo dei Costi:
+- **Schema Senza Ridondanza ($S_1$):**
+  - Scrittura ($OP_C$): $1 \text{ scrittura in CONTRATTO} = 2$. Costo annuo: $2 \times 180 = 360$.
+  - Lettura ($OP_D$): per ciascun evento si leggono mediamente 3 contratti ($3 \times 1 = 3$) e 2 location ($2 \times 1 = 2$). Costo per evento = $5$. Per i 40 eventi attivi: $5 \times 40 = 200$. Costo annuo: $200 \times 148 = 29.600$.
+  - **Costo Annuo Totale $S_1$:** $360 + 29.600 = \mathbf{29.960}$.
+- **Schema Con Ridondanza ($S_2$):**
+  - Scrittura ($OP_C$): scrittura in `CONTRATTO` ($2$) + lettura `EVENTO` ($1$) + scrittura aggiornamento `EVENTO` ($2$) = $5$. Inoltre, per modifiche alle location (`SVOLGIMENTO_EVENTO`), ulteriore scrittura su `EVENTO` ($2$). Costo annuo medio: $5 \times 180 = 900$.
+  - Lettura ($OP_D$): lettura diretta della riga `EVENTO` per 40 eventi = $40 \times 1 = 40$. Costo annuo: $40 \times 148 = 5.920$.
+  - **Costo Annuo Totale $S_2$:** $900 + 5.920 = \mathbf{6.820}$.
+
+| Schema | Costo Scrittura | Costo Lettura | Costo Totale Annuo | Note di Valutazione |
+| :--- | :---: | :---: | :---: | :--- |
+| **Senza Ridondanza ($S_1$)** | 360 | 29.600 | **29.960** | Nessun rischio di disallineamento |
+| **Con Ridondanza ($S_2$)** | 900 | 5.920 | **6.820** | Richiede trigger complessi su 2 tabelle distinte |
+
+> **Decisione Formale: SCARTATA.**
+> Sebbene $S_2$ mostri un risparmio aritmetico, **la ridondanza viene respinta per ragioni architetturali e di integrità**:
+> 1. L'attributo dipende da **due distinte entità sorgente** (`CONTRATTO` e `LOCATION` tramite `SVOLGIMENTO_EVENTO`), richiedendo 4 distinti trigger (`AFTER INSERT/UPDATE/DELETE` su entrambe le tabelle) ad elevato rischio di lock concorrenti durante la stipula dei contratti.
+> 2. La lettura avviene quasi esclusivamente in una procedura batch settimanale (STAT-02), dove un tempo di calcolo di pochi millisecondi è del tutto trascurabile rispetto alla garanzia di assoluta consistenza finanziaria.
+
+---
+
+### Ridondanza 3: Attributo `posti_occupati` in `TAVOLO` (Candidato SCARTATO)
+
+- **Dato derivabile:** $\text{PostiOccupati} = \text{COUNT}(p \in \text{PARTECIPAZIONE} : p.\text{tavolo\_nome\_numero} = \text{tavolo})$.
+- **Operazioni impattate:**
+  - $OP_E$ (Scrittura): Assegnazione o spostamento ospite al tavolo (`OP-08`, $F = 1.200 \text{ volte/anno}$).
+  - $OP_F$ (Lettura): Visualizzazione mappa tavoli e saturazione nella GUI ($F = 1.200 \text{ volte/anno}$).
+
+#### Calcolo Comparativo dei Costi:
+- **Senza Ridondanza ($S_1$):**
+  - Scrittura: aggiornamento di `PARTECIPAZIONE` ($2$). Costo annuo: $2 \times 1.200 = 2.400$.
+  - Lettura: un tavolo ospita in media $10$ persone. La scansione delle 10 tuple partecipanti via indice primario costa $10 \text{ accessi } L$. Costo annuo: $10 \times 1.200 = 12.000$.
+  - Totale $S_1$: $2.400 + 12.000 = \mathbf{14.400}$.
+- **Con Ridondanza ($S_2$):**
+  - Scrittura: aggiornamento `PARTECIPAZIONE` ($2$) + lettura vecchio tavolo ($1$) + decremento vecchio tavolo ($2$) + lettura nuovo tavolo ($1$) + incremento nuovo tavolo ($2$) = $8$. Costo annuo: $8 \times 1.200 = 9.600$.
+  - Lettura: lettura singola riga `TAVOLO` ($1$). Costo annuo: $1 \times 1.200 = 1.200$.
+  - Totale $S_2$: $9.600 + 1.200 = \mathbf{10.800}$.
+
+> **Decisione Formale: SCARTATA.**
+> Il risparmio annuo ($3.600$ accessi) è marginale e non giustifica l'introduzione di **colli di bottiglia di concorrenza** (row-lock su `TAVOLO`) durante le sessioni intensive di assegnazione posti da parte del Wedding Planner, dove più operatori potrebbero assegnare contemporaneamente ospiti a tavoli diversi.
+
+---
+
+### Ridondanza 4: Flag `completato` in `REGALO` (Candidato ACCETTATO)
+
+- **Dato derivabile:** Flag `CHAR(1)` che vale `'S'` se la somma delle quote versate copre o supera il prezzo del bene ($\sum q.\text{importo} \ge r.\text{prezzo}$), altrimenti `'N'`.
+- **Operazioni impattate:**
+  - $OP_G$ (Scrittura): Registrazione quota regalo (`OP-10`, $F = 1.800 \text{ volte/anno}$).
+  - $OP_H$ (Lettura): Consultazione catalogo regali aperti da parte degli invitati e filtro donazioni disponibili ($F = 5.400 \text{ volte/anno}$).
+
+#### Calcolo Comparativo dei Costi:
+- **Senza Ridondanza ($S_1$):**
+  - Scrittura: inserimento in `QUOTA_REGALO` ($2$). Costo: $2 \times 1.800 = 3.600$.
+  - Lettura: per filtrare i regali completati, occorre eseguire un'aggregazione `LEFT JOIN` e `HAVING` tra `REGALO` (8 articoli) e tutte le `QUOTA_REGALO` (50 quote). Costo per lettura $\approx 58$. Costo annuo: $58 \times 5.400 = 313.200$.
+  - Totale $S_1$: $3.600 + 313.200 = \mathbf{316.800}$.
+- **Con Ridondanza ($S_2$):**
+  - Scrittura: inserimento `QUOTA_REGALO` ($2$) + verifica condizione e aggiornamento flag in `REGALO` solo se saturato (in media 1 volta su 6 quote = 0.17 scritture): $2 + (0.17 \times 2) = 2.34$. Costo annuo: $2.34 \times 1.800 = 4.212$.
+  - Lettura: scansione diretta della tabella `REGALO` con condizione `WHERE completato = 'N'` (8 letture indicizzate). Costo annuo: $8 \times 5.400 = 43.200$.
+  - Totale $S_2$: $4.212 + 43.200 = \mathbf{47.412}$.
+
+$$\Delta \text{Costo} = 316.800 - 47.412 = \mathbf{+269.388 \text{ accessi risparmiati all'anno (-85.0\%)}}$$
+
+> **Decisione Formale: ACCETTATA.**
+> Mantenere il flag `completato` garantisce un abbattimento straordinario del carico di query analitiche durante la navigazione web/mobile della lista nozze da parte degli ospiti, ed è manutenuto in modo del tutto trasparente dal trigger `trg_quota_aggiorna_totale`.
+
+---
+
 # 6. Raffinamento e Ristrutturazione dello Schema E/R
 
 Per consentire la traduzione nel modello relazionale, lo schema E/R concettuale viene ristrutturato affrontando:

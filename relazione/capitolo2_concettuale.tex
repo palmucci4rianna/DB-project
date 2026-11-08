@@ -1,0 +1,86 @@
+\chapter{Progettazione Concettuale}
+
+\section{Strategia di Progettazione e Schema Scheletro}
+La progettazione concettuale è stata condotta adottando una strategia mista: un approccio \textit{top-down} per individuare i macro-concetti portanti del dominio (Coppia, Dipendente, Evento, Fornitore, Checklist, Partecipazione) integrato da una raffinazione \textit{bottom-up} a partire dagli attributi elementari emersi nell'intervista.
+
+Data la dimensione del dominio (composto da 33 entità e 42 associazioni), la concettualizzazione è stata strutturata in sei aree logico-funzionali coordinate:
+
+\begin{enumerate}
+    \item \textbf{Area Risorse Umane e Staff:} Gestione anagrafica centrale (\texttt{PERSONA}), ruoli aziendali e storico delle assenze e assegnazioni.
+    \item \textbf{Area Committenti e Consulenza:} Gestione della \texttt{COPPIA}, comunicazioni formali e appuntamenti di consulenza.
+    \item \textbf{Area Evento e Spazi:} Entità \texttt{EVENTO}, coordinamento delle \texttt{LOCATION} con fasce orarie e mappatura dei \texttt{TAVOLI}.
+    \item \textbf{Area Fornitori e Contrattualistica:} Catalogo fornitori per categoria, gestione del ciclo di vita dei \texttt{PREVENTIVI} e formalizzazione dei \texttt{CONTRATTI}.
+    \item \textbf{Area Pianificazione e Regia:} Pattern template su 3 livelli per \texttt{CHECKLIST} operativa e coordinamento orario minuto per minuto (\texttt{TIMELINE}).
+    \item \textbf{Area Ospiti e Donazioni:} Gestione delle presenze (\texttt{PARTECIPAZIONE}), profilassi allergeniche, \texttt{LISTA\_NOZZE} e versamento delle \texttt{QUOTE\_REGALO}.
+\end{enumerate}
+
+\section{Dizionario delle Entità Principali}
+Si riporta di seguito la specifica formale delle entità cardine del modello concettuale:
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l p{4cm} p{3.5cm} X}
+\toprule
+\textbf{Entità} & \textbf{Descrizione Semantica} & \textbf{Identificatore} & \textbf{Attributi Principali} \\
+\midrule
+\texttt{PERSONA} & Generalizzazione IS-A che unifica coniugi, invitati e dipendenti. & \texttt{codice\_fiscale} & Nome, cognome, email, telefono. \\
+\addlinespace
+\texttt{COPPIA} & Soggetto contrattuale costituito da due coniugi (\texttt{PERSONA}). & \texttt{username} & Data prevista nozze, budget indicativo. \\
+\addlinespace
+\texttt{DIPENDENTE} & Membro dello staff aziendale (wedding planner, coordinatore). & \texttt{codice\_fiscale} & Email aziendale, data assunzione, data fine rapporto, stato servizio. \\
+\addlinespace
+\texttt{EVENTO} & Progetto nuziale coordinato dall'agenzia, debole da \texttt{COPPIA}. & \texttt{(username\_coppia, data)} & Budget effettivo, invitati previsti, tipo cerimonia, tema/stile, stato. \\
+\addlinespace
+\texttt{LOCATION} & Sede fisica in convenzione per rito o ricevimento. & \texttt{nome\_location} & Indirizzo, città, capienza massima, costo affitto base, referente. \\
+\addlinespace
+\texttt{TAVOLO} & Tavolo della sala ricevimento, debole da \texttt{EVENTO}. & \texttt{(evento, nome\_numero)} & Capienza massima, forma (tondo, imperiale), zona sala. \\
+\addlinespace
+\texttt{FORNITORE} & Impresa partner accreditata nel catalogo di agenzia. & \texttt{partita\_iva} & Ragione sociale, categoria merceologica, telefono, email, attivo (S/N). \\
+\addlinespace
+\texttt{PREVENTIVO} & Proposta commerciale emessa da un fornitore per un evento. & \texttt{(partita\_iva, num\_preventivo)} & Data emissione, data scadenza validità, importo proposto, stato. \\
+\addlinespace
+\texttt{CONTRATTO} & Accordo vincolante derivante da preventivo accettato (1:1). & \texttt{(partita\_iva, num\_preventivo)} & Data stipula, importo concordato definitivo, acconto versato, stato pagamento. \\
+\addlinespace
+\texttt{PARTECIPAZIONE}& Relazione tra invitato ed evento per gestione RSVP e tavolo. & \texttt{(codice\_fiscale, evento)} & Stato RSVP, intolleranze, esigenze alimentari, menù scelto, tavolo. \\
+\addlinespace
+\texttt{LISTA\_NOZZE} & Registro regali e conto per contributi degli invitati (1:1). & \texttt{evento} & Coordinate bancarie (IBAN, banca, intestatario), totale raccolto. \\
+\addlinespace
+\texttt{QUOTA\_REGALO} & Versamento economico effettuato da un invitato all'evento. & \texttt{(invitato, evento, data\_ora)} & Importo, metodo pagamento, stato transazione, messaggio auguri, regalo. \\
+\bottomrule
+\end{tabularx}
+\caption{Estratto del dizionario delle entità fondamentali del modello.}
+\label{tab:dizionario_entita}
+\end{table}
+
+\section{Vincoli Non Esprimibili nello Schema Concettuale (Vincoli Inespressi)}
+I vincoli aziendali e le regole di business che non possono essere rappresentati graficamente mediante cardinalità min-max nel diagramma E/R sono stati formalizzati rigorosamente:
+
+\begin{enumerate}[label=\textbf{[V-\arabic*]}]
+    \item \textbf{Distinzione dei Coniugi:} Una coppia deve essere composta da due persone fisiche distinte:
+    \[ \forall c \in \text{COPPIA} : c.\text{cf\_coniuge1} \neq c.\text{cf\_coniuge2} \]
+    
+    \item \textbf{Eleggibilità Donatore Quota Regalo:} Una quota regalo può essere versata solo ed esclusivamente da un soggetto regolarmente censito tra gli invitati dello specifico evento nuziale:
+    \[ \forall q \in \text{QUOTA\_REGALO} \implies \exists p \in \text{PARTECIPAZIONE} : (p.\text{CF} = q.\text{CF} \land p.\text{Evento} = q.\text{Evento}) \]
+    
+    \item \textbf{Plafond Massimo Regalo a Quota Fissa/Libera:} La somma delle quote destinate a uno specifico regalo non può eccedere il prezzo nominale del regalo stesso:
+    \[ \forall r \in \text{REGALO} : \sum_{q \in \text{QUOTA\_REGALO}(r)} q.\text{importo} \le r.\text{prezzo} \]
+    
+    \item \textbf{Non Sovrapposizione Assenze Personale:} Un dipendente non può avere periodi di indisponibilità/assenza che si sovrappongono temporalmente:
+    \[ \forall d_1, d_2 \in \text{DISPONIBILITA} : (d_1 \neq d_2 \land d_1.\text{CF} = d_2.\text{CF}) \implies (d_1.\text{fine} < d_2.\text{inizio} \lor d_2.\text{fine} < d_1.\text{inizio}) \]
+    
+    \item \textbf{Limite Carico Contemporaneo Wedding Planner:} Un dipendente non può essere assegnato attivamente come Lead Planner a un numero di matrimoni contemporanei superiore al valore massimo consentito dal suo ruolo contrattuale:
+    \[ \forall d \in \text{DIPENDENTE} : \text{COUNT}(e \in \text{EVENTI\_ATTIVI}(d)) \le d.\text{max\_eventi\_contemporanei} \]
+    
+    \item \textbf{Coerenza Temporale Stipula Contratto:} La firma di un contratto con un fornitore deve avvenire prima o al massimo nella data dell'evento:
+    \[ \forall c \in \text{CONTRATTO}, e \in \text{EVENTO} : c.\text{data\_firma} \le e.\text{data} \]
+    
+    \item \textbf{Assegnazione Posti Vincolata a RSVP Confermato:} Un partecipante può occupare un posto a un tavolo se e solo se ha confermato esplicitamente la propria presenza:
+    \[ \forall p \in \text{PARTECIPAZIONE} : (p.\text{tavolo} \neq \text{NULL}) \implies (p.\text{stato} = \text{'CONFERMATO'}) \]
+    
+    \item \textbf{Capienza Massima dei Tavoli della Sala:} Il numero di invitati seduti a un tavolo non può superare la capienza massima stabilita per quel tavolo:
+    \[ \forall t \in \text{TAVOLO} : \text{COUNT}(p \in \text{PARTECIPAZIONE} : p.\text{tavolo} = t) \le t.\text{capienza} \]
+    
+    \item \textbf{Recensione Riservata a Matrimoni Conclusi:} Una coppia può rilasciare una recensione solo dopo che l'evento ha raggiunto lo stato di completamento effettivo:
+    \[ \forall r \in \text{RECENSIONE}, e \in \text{EVENTO} : r.\text{data\_recensione} \ge e.\text{data} \land e.\text{stato} = \text{'completato'} \]
+\end{enumerate}

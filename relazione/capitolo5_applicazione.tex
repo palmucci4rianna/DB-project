@@ -1,0 +1,92 @@
+\chapter{Progettazione dell'Applicazione Software}
+
+\section{Architettura Software Complessiva}
+L'applicazione software, denominata \textbf{Wedding Planner Studio Desktop}, è stata realizzata in linguaggio \textbf{Java 21 LTS} utilizzando lo strumento di automazione \textbf{Gradle 9.2} e il driver ufficiale \textbf{MySQL Connector/J 8.3.0}.
+
+L'architettura del sistema adotta una strutturazione a livelli (\textit{3-Tier Layered Architecture}) basata sul pattern \textbf{Data Access Object (DAO)}:
+
+\begin{enumerate}
+    \item \textbf{Presentation Layer (\texttt{db\_lab.ui}):} Interfaccia grafica desktop sviluppata con la libreria \textbf{Java Swing}, integrata con il Look \& Feel nativo del sistema operativo per un'esperienza d'uso fluida ed ergonomica. La finestra principale (\texttt{MainWindow.java}) è organizzata in un \texttt{JTabbedPane} modulare a 6 schede.
+    \item \textbf{Data Access Layer (\texttt{db\_lab.dao}):} Modulo responsabile dell'incapsulamento dell'accesso alla base di dati, della composizione dei \texttt{PreparedStatement} per la prevenzione totale da attacchi \textit{SQL Injection} e della conversione dei \texttt{ResultSet} in strutture dati tipizzate.
+    \item \textbf{Persistence Layer (MySQL 8.0):} Storage engine InnoDB locale su porta 3306, con gestione transazionale e trigger attivi.
+\end{enumerate}
+
+\section{Organizzazione dei Moduli e Package}
+I sorgenti applicativi sono organizzati nei seguenti package:
+\begin{itemize}[noitemsep]
+    \item \texttt{db\_lab.App}: Entry point dell'applicazione; inizializza il Look \& Feel e stabilisce la connessione JDBC tramite credenziali dinamiche.
+    \item \texttt{db\_lab.ui.MainWindow}: Controller e vista unificata della GUI desktop; gestisce eventi, rendering tabellare e finestre modali.
+    \item \texttt{db\_lab.data.DAOUtils}: Utility factory per connessioni JDBC e metodo generico \texttt{executeGenericQuery(...)}.
+    \item \texttt{db\_lab.data.QueryResult}: Record immutabile Java 21 che trasporta metadati delle colonne, righe di dati, conteggio record e tempo di esecuzione in millisecondi, con serializzazione diretta in vettori compatibili con \texttt{DefaultTableModel}.
+    \item \texttt{db\_lab.dao.StatisticheDAO}: Motore dedicato all'esecuzione e metadati delle 8 query analitiche (\texttt{STAT-01} .. \texttt{STAT-08}).
+    \item \texttt{db\_lab.dao.EventoDAO}: Consultazione anagrafica matrimoni, budget allocato, planner assegnati e totale contratti.
+    \item \texttt{db\_lab.dao.TavoliDAO}: Navigazione tavoli della sala, elenco invitati per matrimonio e metodo transazionale di assegnazione posto \texttt{assegnaTavolo(...)}.
+    \item \texttt{db\_lab.dao.FornitoreDAO}: Anagrafica fornitori per categoria merceologica e contratti per matrimonio.
+    \item \texttt{db\_lab.dao.ListaNozzeDAO}: Lettura coordinate bancarie, regali, quote ricevute e inserimento di nuove donazioni.
+\end{itemize}
+
+\section{Descrizione Dettagliata delle Schede dell'Applicazione}
+
+\subsection{Scheda 1: Statistiche Direzionali (STAT-01 .. STAT-08)}
+Costituisce il cruscotto direzionale avanzato per la direzione e i planner. Consente di:
+\begin{itemize}[noitemsep]
+    \item Selezionare tramite menu a discesa una qualsiasi delle 8 interrogazioni statistiche previste dalle specifiche.
+    \item Visualizzare il titolo, la descrizione estesa dell'obiettivo aziendale e, opzionalmente, il codice SQL eseguito.
+    \item Premere il pulsante \textbf{«⚡ Esegui Statistica»} per popolare istantaneamente la tabella risultati.
+    \item Ordinare dinamicamente le righe cliccando sulle intestazioni di colonna (\texttt{TableRowSorter}).
+    \item Monitorare nella status bar inferiore il tempo di esecuzione preciso (tipicamente inferiore a 15 ms) e il numero di tuple restituite.
+\end{itemize}
+
+\subsection{Scheda 2: Panoramica Eventi \& Matrimoni}
+Offre una vista a volo d'uccello di tutti i matrimoni registrati a sistema:
+\begin{itemize}[noitemsep]
+    \item Dati esposti: Coppia committente, data fissata, stato avanzamento (\texttt{in\_pianificazione}, \texttt{confermato}, \texttt{completato}), budget effettivo, invitati previsti, tipo di rito, tema scenografico, wedding planner responsabile e totale dei contratti fornitore impegnati.
+    \item Pulsante di aggiornamento rapido in tempo reale.
+\end{itemize}
+
+\subsection{Scheda 3: Table Planner \& Gestione Ospiti (RSVP)}
+Progettata specificamente per l'allestimento della sala e la sicurezza alimentare degli ospiti:
+\begin{itemize}[noitemsep]
+    \item \textbf{Pannello sinistro (Tavoli):} Elenco dei tavoli con nome/numero, capienza massima, posti occupati, posti liberi e stato di saturazione (\texttt{DISPONIBILE}, \texttt{COMPLETO}, \texttt{VUOTO}).
+    \item \textbf{Pannello destro (Invitati):} Elenco partecipanti con codice fiscale, nominativo, recapiti, stato di conferma (\texttt{CONFERMATO}, \texttt{IN\_ATTESA}, \texttt{RIFIUTATO}), tipologia di menù e indicazione chiara di allergie ed intolleranze.
+    \item \textbf{Pannello inferiore di Assegnazione Posto:} Selezionando un invitato e scegliendo un tavolo, il pulsante \textbf{«Assegna / Sposta Tavolo»} esegue la transazione validando a livello software e DB i vincoli di business (impedendo ad esempio l'assegnazione a chi ha stato \texttt{IN\_ATTESA} o il superamento della capienza massima).
+\end{itemize}
+
+\subsection{Scheda 4: Fornitori \& Contratti}
+Consente la gestione del catalogo partner:
+\begin{itemize}[noitemsep]
+    \item Filtro dinamico per settore merceologico (\textit{Catering, Fotografia, Fiori, Musica, Abiti, Tutte}).
+    \item Monitoraggio del numero di contratti stipulati e del fatturato complessivo intermediato.
+    \item Nel pannello inferiore, selezione del matrimonio per consultare il dettaglio economico dei singoli contratti: fornitore, data firma, importo concordato, acconto già corrisposto e saldo ancora da saldare.
+\end{itemize}
+
+\subsection{Scheda 5: Lista Nozze \& Donazioni}
+Gestione trasparente dei contributi economici degli invitati:
+\begin{itemize}[noitemsep]
+    \item Banner superiore con coordinate bancarie (IBAN, Banca, Intestatario) e progresso percentuale del totale raccolto rispetto al totale desiderato dalla coppia.
+    \item Tabella articoli desiderati con target di prezzo e percentuale di copertura raggiunta.
+    \item Tabella storico quote versate con data, nome donatore, metodo di pagamento e messaggio di auguri.
+    \item Pulsante \textbf{«💳 Nuova Quota Regalo»}: apre una finestra di dialogo modale che consente di registrare una donazione live nel database, validando il donatore ed azionando il trigger che aggiorna istantaneamente il saldo della lista nozze.
+\end{itemize}
+
+\subsection{Scheda 6: Console SQL Interattiva}
+Inserita per agevolare le fasi di collaudo e la discussione orale d'esame con i docenti:
+\begin{itemize}[noitemsep]
+    \item Area di testo per inserire qualsiasi query libera \texttt{SELECT}.
+    \item Pulsanti di accesso rapido per interrogazioni frequenti (Elenco Coppie, Attività Checklist con Ritardi, Fornitori attivi, Recensioni).
+    \item Rendering automatico e dinamico della struttura delle colonne e dei dati restituiti.
+\end{itemize}
+
+\section{Verifica e Test Automatizzati del Software}
+L'affidabilità del sistema è stata garantita tramite una suite di test automatici scritta con \textbf{JUnit 5} e \textbf{AssertJ} nella classe \texttt{WeddingPlannerTest.java}:
+\begin{itemize}[noitemsep]
+    \item \textbf{Test di Connessione:} Accerta la raggiungibilità del database \texttt{wedding\_planner} su porta 3306.
+    \item \textbf{Test Parametrizzato Query Analitiche:} Esegue a rotazione tutte le 8 query analitiche (\texttt{STAT-01} fino a \texttt{STAT-08}), verificando che il set di risultati sia non nullo, che il numero di tuple restituite sia coerente con il dataset e che i tempi di esecuzione siano nell'ordine dei millisecondi.
+    \item \textbf{Test dei DAO di Business:} Verifica la correttezza delle query di \texttt{EventoDAO}, \texttt{TavoliDAO}, \texttt{FornitoreDAO} e \texttt{ListaNozzeDAO}.
+\end{itemize}
+
+L'esecuzione della suite di collaudo:
+\begin{lstlisting}[language=bash]
+./gradlew test
+\end{lstlisting}
+ha registrato il completamento con successo di tutti i \textbf{17 test} eseguiti con \textbf{zero errori o fallimenti} (\textit{BUILD SUCCESSFUL}).

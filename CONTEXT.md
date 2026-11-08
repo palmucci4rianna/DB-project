@@ -144,122 +144,105 @@ riepilogo finanziario annuo (fatturato, numero eventi, margine).
 
 ---
 
-## 5. Problemi e incoerenze nel modello attuale (da risolvere)
+## 5. Problemi e Decisioni Ancora Aperti (Da Risolvere)
 
-### 5.1 Due versioni dello schema in conflitto
-| Aspetto | Mermaid `.md`/`.png` (vecchio) | Snippet nel docx `dic26` (nuovo) |
-|---|---|---|
-| Chiavi | `int id` surrogata ovunque | Chiavi naturali/composte (`username_coppia`, `dipendente_email`, `CF`, `partita_iva`…) |
-| Storico | `ASSEGNAZIONE_PLANNER` | `ASSEGNAZIONE_DIPENDENTE` |
-| Fornitori | Nessuna `CATEGORIA_FORNITORE` né `COLLABORAZIONE` | Presenti |
-| Evento–Preventivo | 1:N | N:M (`EVENTO_PREVENTIVO`, che però usa `int id`) |
-| Checklist | `completata` boolean presente | `completata` assente |
+Tutti i problemi concettuali, di modellazione relazionale e di vincoli di dominio sono stati **definitivamente allineati e risolti** (vedi archivio completo in §6).
 
-→ Decidere **una** versione. Nella relazione lo schema concettuale non ha chiavi surrogate; si
-scelgono le chiavi nella fase logica ("Scelta delle chiavi"), dove si possono introdurre id surrogati motivandoli.
-
-### 5.2 Errori puntuali nello snippet `dic26`
-- `DIPENDENTE`: PK `dipendente_email` **e** attributo `email` duplicato.
-- `RUOLO`: PK `nome` **e** `nome` duplicato. `FORNITORE`: `partita_iva` duplicata.
-- `FORNITORE.categoria` (stringa) **e** l'associazione con `CATEGORIA_FORNITORE`: è ridondante, tenere solo l'associazione.
-- `EVENTO` ha PK `(username_coppia, data, tipologia)` ma tutte le FK verso l'evento usano solo
-  `(username_coppia, evento_data)`. Inoltre `tipologia` e `tipo_cerimonia` si confondono: chiarire
-  (tipologia = matrimonio/pre/post; tipo_cerimonia = civile/religiosa/…).
-- `COPPIA.username_coppia`: lo username non compare nei requisiti e la coppia non fa login.
-- `INVITATO.stato` **e** `PARTECIPAZIONE.stato`: lo stato dipende dall'evento, quindi va **solo** in Partecipazione
-  (anche la bozza lo nota: "in invitato ho lo stato → non gestire"). Lo stesso vale per `relazione` con gli sposi
-  (un ospite ricorrente può essere amico di una coppia e cugino di un'altra) → spostarla in Partecipazione.
-- `INVITATO` PK `CF`: va bene con le chiavi naturali (vedi §7), ma va scritto tra le assunzioni che serve il CF di ogni ospite.
-- `PARTECIPAZIONE`: nella lista attributi mancano le FK verso Tavolo e Bomboniera.
-- `PRENOTAZIONE` PK `(CF_invitato, id_regalo)`, ma `REGALO` non ha `id_regalo` (la sua PK è `(coppia, data, descrizione)`).
-- `ATTIVITA_TIMELINE`: PK `(id_attivita, orario_previsto)` senza FK verso timeline/evento; `responsabile`
-  è una stringa ma esiste anche l'associazione con DIPENDENTE. Il responsabile può essere **anche un fornitore**:
-  servono due FK opzionali mutuamente esclusive (vincolo da dichiarare).
-- `ATTIVITA_CHECKLIST`: manca `completata`/`data_completamento` (serve per la statistica 8), mancano le FK
-  verso dipendente responsabile, voce_template e **fornitore** (la bozza dice "collegabile a un fornitore").
-- `VOCE_TEMPLATE`: manca l'attributo `fase` citato nel testo.
-- `CHECKLIST` PK `id_checklist` senza tipo e senza legame con l'evento.
-- `RECENSIONE`: PK con `voto` → sbagliato, la PK è l'evento (1:1).
-- `APPUNTAMENTO`: manca la FK verso il dipendente (associazione "conduce").
-- `COMUNICAZIONE`: `mittente` stringa nella PK; il mittente può essere la coppia o un dipendente → FK dipendente + campo direzione.
-  I "promemoria automatici" sono una funzione dell'app, da togliere dal DB o modellare a parte.
-- `DISPONIBILITA`: ha `tipo` e `stato` ma manca la FK verso `MOTIVO_ASSENZA`.
-- `EVENTO`–`LOCATION` N:M: mancano gli attributi dell'associazione (`ora_inizio`, `ora_fine`, magari un uso:
-  cerimonia/aperitivo/ricevimento). `servizi_inclusi` è multivalore (stringa oppure entità a parte).
-
-### 5.3 Problemi di modellazione più profondi
-1. **Preventivo N:M Evento rompe i calcoli economici.** Se un preventivo (e quindi il contratto 1:1) vale per
-   più eventi, la statistica 2 (budget vs contratti per evento) e la 4 diventano ambigue. **Consiglio: Preventivo N:1 Evento**
-   (come nel mermaid vecchio). Due eventi simili ricevono due preventivi distinti.
-2. **Manca il ricavo dell'agenzia.** Il "riepilogo finanziario con fatturato e margine" non è calcolabile: i contratti
-   sono soldi della coppia verso i fornitori. Serve per esempio `EVENTO.compenso_agenzia` (o una % sui contratti) e
-   magari i costi del personale.
-3. **Assegnazione legata alla coppia, ma il limite riguarda gli "eventi attivi".** Se una coppia ha più eventi
-   (pre/post), il conteggio non torna. Decidere se assegnare il dipendente all'**evento** oppure contare le coppie.
-   Inoltre "un dipendente ricopre ruoli diversi" contraddice `DIPENDENTE }o--|| RUOLO` (N:1).
-4. **Persona come generalizzazione.** Il testo la cita (componenti della coppia + dipendenti, e volendo gli invitati),
-   ma nello schema non c'è. È utile per il report (servono gerarchie da eliminare): `PERSONA` → {`DIPENDENTE`, `SPOSO`, `INVITATO`},
-   con eliminazione motivata. Anche `WeddingPlanner ⊂ Dipendente` è una gerarchia candidata.
-5. **Entità 1:1 quasi vuote** (`TIMELINE`, `CHECKLIST`, `LISTA_NOZZE` hanno solo note/totali): ok nel concettuale, ma
-   nella fase logica conviene **accorparle in EVENTO** (raffinamento da documentare).
-6. **La nota "non totalmente implementabili" n.5 è sbagliata**: il regalo porta all'evento con il percorso
-   `PRENOTAZIONE → REGALO → LISTA_NOZZE → EVENTO`. La query 5 è fattibile. La n.8 regge solo se aggiungiamo `data_completamento`.
-7. **Blocco fornitore**: `FORNITORE.attivo` e `COLLABORAZIONE.stato = sospeso` si sovrappongono. Scegliere uno solo
-   (consiglio: il blocco come record storico in COLLABORAZIONE o un'entità BLOCCO con date e motivo).
-8. **Scope.** Ci sono circa 28 entità e circa 23 operazioni. Siamo in 3, quindi va bene (1453, da 3 persone, aveva circa 35 tabelle).
-
-### 5.4 Ridondanze candidate (per la sezione "Analisi delle ridondanze")
-| Attributo | Derivabile da | Operazioni coinvolte |
-|---|---|---|
-| `EVENTO.n_invitati_confermati` | COUNT di Partecipazione con stato CONFERMATO | aggiornamento tavoli, statistiche 4/7 → **ottimo caso di studio** |
-| `LISTA_NOZZE.totale_raccolto` | SUM(Prenotazione.quota) | nuova prenotazione, visualizzazione lista |
-| `LISTA_NOZZE.totale_desiderato` | SUM(Regalo.prezzo) | |
-| `FORNITORE.valutazione_interna` | AVG(Collaborazione.valutazione) | statistiche fornitori |
-| `CONTRATTO.saldo` | importo_definitivo − acconto | |
-| `REGALO.stato` | Prenotazioni sul regalo | |
-| `RECENSIONE.stagione` | data dell'evento | portfolio |
-| `ASSEGNAZIONE.attiva` | `data_fine IS NULL` | riassegnazione, statistica 3 |
-
-### 5.5 Vincoli inespressi da dichiarare
-- Una sola assegnazione attiva per coppia (o evento) alla volta.
-- Numero di eventi attivi per dipendente ≤ `RUOLO.max_eventi_contemporanei`.
-- Solo le partecipazioni CONFERMATO hanno tavolo/menù/bomboniera; il tavolo deve appartenere **allo stesso evento**.
-- Persone sedute a un tavolo ≤ capienza; invitati confermati ≤ capienza della location.
-- Contratto solo da un preventivo `accettato`; somma delle quote ≤ prezzo del regalo (se regalo multiplo).
-- Non si richiedono preventivi a un fornitore bloccato.
-- `ora_fine > ora_inizio` per le location dell'evento; scadenza dell'attività = data evento − `giorni_prima`.
-- Recensione e foto solo per eventi con stato `completato`.
+L'unico punto operativo aperto riguarda la **Fase 5 (Sviluppo Software)**:
+- [ ] **Configurazione e Sviluppo GUI in JavaFX / FXML:** Configurare in `app/build.gradle.kts` il plugin `org.openjfx.javafxplugin` (moduli `javafx.controls`, `javafx.fxml`) per Java 21 su macOS Apple Silicon e implementare le viste FXML (Dashboard Statistiche, Table Planner, Gestione Evento e Planner).
 
 ---
 
-## 6. Decisioni prese (06/11/2026)
+## 6. Problemi, Errori e Incoerenze Risolti (Archivio Soluzioni)
 
-| # | Tema | Decisione |
-|---|---|---|
-| 1 | Gruppo | **3 persone** → scope ampio ok (paragonabile a 1453), niente tagli |
-| 2 | Proposta | Già approvata, ma avevamo 2 idee: va **riscritta e ricaricata** con solo il wedding planner (sarà accettata) |
-| 3 | Consegna | **Metà dicembre 2026**, scritto a gennaio 2027 |
-| 4 | DBMS | **MySQL** |
-| 5 | App | Java + **JavaFX o Swing** (da decidere) + **JDBC** puro |
-| 6 | Schema ER | **DB-Main** (il mermaid resta solo come bozza) |
-| 7 | Chiavi | **Chiavi naturali, niente id surrogati** (richiesta della prof). La prof apprezza una **buona gestione dei template** (come TemplateChecklist/VoceTemplate) |
-| 8 | Preventivo–Evento | **N:1**: ogni preventivo riguarda un solo evento (via la tabella EVENTO_PREVENTIVO) |
-| 9 | Assegnazione dipendente | All'**Evento** (non alla coppia) → coerente con `max_eventi_contemporanei` |
-| 10 | Ruoli del dipendente | **Più ruoli** per dipendente (N:M) — *WIP* |
-| 11 | Dominio | L'ER modella **una sola agenzia (la nostra)** e i suoi dipendenti; nessuna entità AGENZIA. Il prezzo sta nel preventivo, legato all'evento |
-| 12 | Lista nozze | Regalo **prenotabile da più invitati**, ognuno con la sua quota (come già nella bozza) |
-| 13 | Persone | **Sì a PERSONA** come generalizzazione (dipendenti, coniugi, invitati) |
+Questa sezione archivia tutti i problemi, bug e conflitti di modellazione precedentemente rilevati che sono stati **formalmente risolti e implementati** nei documenti e negli script di progetto.
 
-### Ancora aperto
-- [ ] JavaFX o Swing
-- [ ] Dettaglio dei ruoli multipli (N:M semplice o con storico/date)
-- [ ] Ricavi dell'agenzia: proposta inserita nell'ER (vedi §8, "Ricavi"), da confermare
-- [ ] Chiave naturale per ogni entità (vedi §7)
-- [ ] Estendere il pattern template anche ad altro (es. **template di timeline** per tipo di cerimonia)
+### 6.1 Unificazione dello Schema Concettuale e Risoluzione Conflitti (ex §5.1)
+* **Stato:** **RISOLTO**.
+* **Soluzione Adottata:** Eliminata la dicotomia tra Mermaid vecchio e bozza docx. È stata adottata in modo univoco l'architettura a **33 entità con chiavi naturali e identificatori primari coerenti**, formalizzata in:
+  - [`md/progettazione-concettuale.md`](md/progettazione-concettuale.md): glossario a 33 termini, tabella ambiguità, dizionario entità e associazioni con cardinalità $(min, max)$.
+  - [`md/wedding-planner.md`](md/wedding-planner.md): diagramma Mermaid completo a 33 entità senza box isolati.
+  - [`schema.sql`](schema.sql): script DDL ANSI SQL-92 per il reverse engineering pulito in DB-main.
+
+### 6.2 Risoluzione dei 18 Errori Puntuali dello Snippet (ex §5.2)
+1. **`DIPENDENTE`:** PK normalizzata su `codice_fiscale` (specializzazione IS-A di `PERSONA`). L'attributo `email_aziendale` è `VARCHAR(100) UNIQUE NOT NULL`. L'email personale risiede in `PERSONA`.
+2. **`RUOLO` e `FORNITORE`:** Eliminate le duplicazioni; PK `RUOLO.nome_ruolo` e `FORNITORE.partita_iva`.
+3. **`FORNITORE.categoria`:** Rimossa la stringa ridondante in `FORNITORE`; la categoria merceologica è garantita unicamente dalla chiave esterna `nome_categoria REFERENCES CATEGORIA_FORNITORE(nome_categoria)` [V-17].
+4. **Chiave Primaria `EVENTO`:** Formalizzata come `(username_coppia, data)`. Chiarita la semantica: `tipo_cerimonia` (civile, religiosa, simbolica) e `tema_stile` (palette e scenografia).
+5. **`COPPIA.username`:** Mantenuto come chiave primaria naturale sintetica del soggetto contrattuale committente, referenziando due coniugi distinti con vincolo `CHECK (cf_coniuge1 <> cf_coniuge2)` [V-01].
+6. **Stato Invitato vs Partecipazione:** Lo stato dell'invito (`CONFERMATO`, `RIFIUTATO`, `IN_ATTESA`) è collocato **esclusivamente** in `PARTECIPAZIONE(codice_fiscale, username_coppia, data_evento)`. In `INVITATO` risiedono solo i dati anagrafici globali (`rapporto_parentela`, `nucleo_familiare`, `tipologia_bomboniera`).
+7. **`INVITATO` con PK `codice_fiscale`:** Censito come sottotipo di `PERSONA` con assunzione di dominio esplicitata.
+8. **Foreign Keys in `PARTECIPAZIONE`:** Inclusa la FK `tavolo_nome_numero REFERENCES TAVOLO`. `BOMBONIERA` è collegata a `INVITATO` tramite FK facoltativa `tipologia_bomboniera REFERENCES BOMBONIERA(tipologia)` [V-18].
+9. **Ristrutturazione `PRENOTAZIONE` → `QUOTA_REGALO`:** Sostituita con `QUOTA_REGALO(codice_fiscale, username_coppia, data_evento, data_ora)`. La quota è indipendente dalla lista nozze per donazioni monetarie libere (`descrizione_regalo NULLABLE`), ma vincola il donante a essere un invitato dell'evento tramite FK composita su `PARTECIPAZIONE` [V-02].
+10. **`ATTIVITA_TIMELINE`:** PK definita come `(username_coppia, data_evento, orario_previsto)` legata a `TIMELINE` ed `EVENTO`.
+11. **`ATTIVITA_CHECKLIST`:** Inseriti `scadenza DATE` (calcolata da `EVENTO.data - VOCE_TEMPLATE.giorni_prima_evento`) e `data_completamento DATE NULL` per il calcolo dei ritardi operativi (STAT-07) [V-12].
+12. **`VOCE_TEMPLATE`:** Inserito l'attributo `fase_temporale VARCHAR(50) NOT NULL` (ripreso in `ATTIVITA_CHECKLIST`).
+13. **`CHECKLIST`:** Definita come entità debole 1:1 con `EVENTO` con PK `(username_coppia, data_evento)` e FK verso `TEMPLATE_CHECKLIST(id_template)`.
+14. **`RECENSIONE`:** PK corretta in `(username_coppia, data_evento)` (1:1 da `EVENTO`), con trigger [V-16] che impedisce la recensione se `EVENTO.stato <> 'completato'`.
+15. **`APPUNTAMENTO`:** Inserita la FK `dipendente_cf REFERENCES DIPENDENTE` e la FK facoltativa `categoria_assenza REFERENCES MOTIVO_ASSENZA` (obbligatoria con `CHECK` condizionale se `stato = 'annullato'`) [V-09].
+16. **`COMUNICAZIONE`:** PK definita da `id_comunicazione AUTO_INCREMENT` con `username_coppia`, `mittente IN ('coppia', 'planner')`, timestamp, canale e testo.
+17. **`DISPONIBILITA`:** Collegata a `MOTIVO_ASSENZA(categoria)` con trigger [V-05] di verifica della non-sovrapposizione temporale delle assenze del personale.
+18. **`SVOLGIMENTO_EVENTO`:** Creata la relazione ponte tra `EVENTO` e `LOCATION` con PK `(username_coppia, data_evento, nome_location, fascia_oraria)` e attributo `tipo_utilizzo`.
+
+### 6.3 Risoluzione dei Problemi di Modellazione Profondi (ex §5.3)
+* **Preventivo 1:N per Evento (non N:M):** Ciascun preventivo è emesso per uno ed un solo evento (`PREVENTIVO.username_coppia, PREVENTIVO.data_evento`), mentre un evento può sollecitare più preventivi concorrenti. Questo rende deterministico e privo di ambiguità il calcolo del budget e dei contratti (STAT-02).
+* **Generalizzazione `PERSONA`:** Modellata gerarchia IS-A con radice `PERSONA` (`codice_fiscale`) e sottotipi `DIPENDENTE` e `INVITATO`. Nel logico è stata formalizzata l'eliminazione delle gerarchie per partizione/sostituzione.
+* **Ruoli Multipli del Personale:** Implementata reificazione $N:M$ tramite tabella `RUOLO_DIPENDENTE(dipendente_cf, nome_ruolo)`.
+* **Fattibilità Query 5 e 8:** Entrambe le interrogazioni sono state formulate in SQL, testate ed eseguite in [`sql/queries.sql`](sql/queries.sql):
+  - STAT-07: percentuali di ritardo checklist per fase e modello.
+  - STAT-08: ospiti ricorrenti a più matrimoni con somma totale delle quote donate.
+* **Stato e Blocco Fornitore:** Armonizzato tramite `FORNITORE.attivo CHAR(1) ('S', 'N')` e storico `COLLABORAZIONE.stato IN ('attiva', 'sospesa', 'cessata')`, con trigger [V-15] che vieta la stipula di contratti con fornitori non attivi.
+
+### 6.4 Analisi Quantitativa delle Ridondanze Risolta (ex §5.4)
+* **Stato:** **RISOLTO**.
+* Formalizzata nel Capitolo 3 ([`md/progettazione-logica.md`](md/progettazione-logica.md), Sezione 5).
+* Calcolo dei costi di lettura ($L=1$) e scrittura ($S=2$) sull'attributo `LISTA_NOZZE.totale_raccolto`: dimostrato un **risparmio annuo di oltre 259.200 accessi (riduzione del 94.7%)**.
+* Implementati in [`sql/ddl.sql`](sql/ddl.sql) i trigger atomici (`trg_quota_regalo_after_insert/update/delete`) per il mantenimento automatico e sincronizzato della ridondanza e del flag `REGALO.completato = 'S'`.
+
+### 6.5 Formalizzazione e Implementazione dei Vincoli Inespressi (ex §5.5)
+* **Stato:** **RISOLTO**.
+* Tutti i 18 vincoli aziendali sono censiti e formalizzati a tre livelli (Concettuale, Logico con `ASSERTION`, Fisico con Trigger MySQL) nel documento dedicato [`md/vincoli-progettazione.md`](md/vincoli-progettazione.md).
+* Implementati a livello fisico con messaggi diagnostici `SIGNAL SQLSTATE '45000'` in [`sql/ddl.sql`](sql/ddl.sql).
+
+### 6.6 Setup Esecutivo e Risoluzione Errori Ambiente Software (App Java)
+* **Stato:** **RISOLTO**.
+* Configurato JDK 21 (OpenJDK 21.0.10) in `gradle.properties`, `gradlew` e `.vscode/settings.json`.
+* Risolto errore named pipe Windows su macOS in `DAOUtils.java`, ripristinando la connessione JDBC TCP su porta 3306.
+* Risolti i bug di compilazione e mapping nei DAO (`Queries.java`, `Tag.java`, `Material.java`, `Product.java`, `AppTest.java`).
+* Eseguita con successo la suite di test (`./gradlew test` al 100% di successi) e avviata regolarmente l'applicazione (`./gradlew run`).
+* Risolto errore sintattico KaTeX per underscore non escapati in `md/progettazione-concettuale.md`.
+
+---
+### 6.7 Decisioni di Modellazione e Dominio Consolidate (08/11/2026)
+* **Ricavi e Fatturato Agenzia:** Adottata la **Semplificazione Accademica**: il fatturato/volume d'affari è misurato dal valore economico complessivo gestito per i matrimoni (somma dei contratti stipulati con i fornitori partner + canoni di affitto location), evitando di appesantire lo schema con la contabilità interna del personale.
+* **Responsabile Operativo Timeline e Checklist:** Confermato **esclusivamente un `DIPENDENTE` dell'agenzia** (`dipendente_cf`), che è l'unico operatore accreditato a sistema per la supervisione dei compiti e il coordinamento sul campo.
+* **Template Timeline:** **Confermata la gestione diretta per evento** (`TIMELINE` e `ATTIVITA_TIMELINE`). Il pattern a template su 3 livelli è mantenuto per la `CHECKLIST` (dove le scadenze $T - \text{giorni}$ sono standardizzabili per rito), mentre la regia della giornata ha orari assoluti e specifici (luce naturale, orari di culto, disponibilità sede).
+* **Tecnologia Interfaccia Grafica:** Scelta **JavaFX / FXML** per l'interfaccia utente finale (con schermate FXML modulari, CSS styling moderno e controller dedicati).
+* **Ancoraggio Assegnazione Wedding Planner:** Confermato l'ancoraggio a **`COPPIA`** (`ASSEGNAZIONE_DIPENDENTE`), garantendo il tracciamento storico della coppia fin dalle prime consulenze e la verifica di carico contemporaneo [V-08] sui matrimoni attivi.
 
 ---
 
-## 7. Note di modellazione
+## 7. Quadro Decisioni Architetturali (Aggiornato)
+
+| # | Tema | Decisione Consolidata | Riferimento Implementativo |
+|---|---|---|---|
+| 1 | Gruppo | **3 persone** → scope ampio a 33 entità, analisi rigorosa dei volumi e dei costi | `md/progettazione-concettuale.md` |
+| 2 | DBMS | **MySQL 8.0 Community Server (Storage Engine InnoDB)** | `md/progettazione-fisica.md`, `sql/ddl.sql` |
+| 3 | Consegna | **Metà dicembre 2026**, appello orale/scritto a gennaio 2027 | Calendario didattico UniBo |
+| 4 | Architettura App | Java 21 + **JavaFX / FXML** + JDBC puro + Pattern DAO/MVC | Cartella `app/`, FXML Views, `./gradlew run` |
+| 5 | Schema ER | **DB-Main** (file `schema.sql` ANSI SQL-92 per estrazione) + Mermaid per documentazione | `schema.sql`, `md/wedding-planner.md` |
+| 6 | Gestione Chiavi | **Chiavi naturali/composte** su concettuale e logico; id surrogati solo dove strettamente necessario | `md/progettazione-logica.md` |
+| 7 | Preventivo–Evento | **1:N**: ogni preventivo riguarda un solo evento; un evento può avere più preventivi concorrenti | [V-14] in `md/vincoli-progettazione.md` |
+| 8 | Assegnazione dipendente | Legata a **Coppia** con storico `[data_inizio, data_fine]`, `motivo_cambio` e flag `attiva` | [V-06, V-07, V-08] in `sql/ddl.sql` |
+| 9 | Ruoli dipendente | **Reificazione N:M** tramite tabella `RUOLO_DIPENDENTE` | `sql/ddl.sql` |
+| 10 | Dominio Agenzia | L'ER modella una sola agenzia; nessuna entità superflua AGENZIA | `md/progettazione-concettuale.md` |
+| 11 | Lista nozze e quote | `QUOTA_REGALO` indipendente dalla lista (ammessi doni liberi), vincolata agli invitati | [V-02, V-03] in `md/vincoli-progettazione.md` |
+| 12 | Gerarchia Persone | Radice `PERSONA` (PK `codice_fiscale`), sottotipi `DIPENDENTE` e `INVITATO`, coppia su 2 persone | `md/progettazione-logica.md` |
+| 13 | Template Checklist | Pattern su 3 livelli: `TEMPLATE_CHECKLIST` → `VOCE_TEMPLATE` → `ATTIVITA_CHECKLIST` | [V-12] in `sql/ddl.sql` |
+
+---
+
+## 8. Note di modellazione
 
 ### PERSONA e COPPIA
 - `PERSONA(CF, nome, cognome, email, telefono, …)` con sottotipi **DIPENDENTE**, **CONIUGE**, **INVITATO**.
@@ -280,7 +263,7 @@ scelgono le chiavi nella fase logica ("Scelta delle chiavi"), dove si possono in
 
 ---
 
-## 8. Bozza ER in DB-Main (`er/wedding-planner.lun`, 06/11/2026)
+## 9. Bozza ER in DB-Main (`er/wedding-planner.lun`, 06/11/2026)
 
 Generata con `er/generatore/genera.sh` tramite JIDBM, l'API Java ufficiale di DB-Main (in `/opt/dbmain/bin/jidbm.jar`).
 Da qui in poi **si modifica in DB-Main**: rilanciare il generatore sovrascrive le modifiche fatte a mano.

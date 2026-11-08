@@ -13,10 +13,7 @@ public final class DAOUtils {
         try {
             var host = "localhost";
             var port = "3306";
-            //var connectionString = "jdbc:mysql://" + host + ":" + port + "/" + database;
-            var connectionString =
-    "jdbc:mysql://localhost:3306/tessiland?useSSL=false&serverTimezone=UTC&socketFactory=com.mysql.cj.protocol.NamedPipeSocketFactory&socket=/tmp/mysql.sock";
-
+            var connectionString = "jdbc:mysql://" + host + ":" + port + "/" + database + "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
             return DriverManager.getConnection(connectionString, username, password);
         } catch (Exception e) {
             throw new DAOException(e);
@@ -43,6 +40,48 @@ public final class DAOUtils {
                 statement.close();
             }
             throw e;
+        }
+    }
+
+    public static Connection getWeddingPlannerConnection() {
+        String[] users = {"root", "ariannapalmucci", "root"};
+        String[] passes = {"", "12345678", "root"};
+        Exception lastException = null;
+
+        for (int i = 0; i < users.length; i++) {
+            try {
+                return localMySQLConnection("wedding_planner", users[i], passes[i]);
+            } catch (Exception e) {
+                lastException = e;
+            }
+        }
+        throw new DAOException("Impossibile connettersi al database 'wedding_planner'. Assicurati che MySQL sia attivo.", lastException);
+    }
+
+    public static QueryResult executeGenericQuery(Connection connection, String sql, Object... values) {
+        long startTime = System.currentTimeMillis();
+        try (var statement = prepare(connection, sql, values);
+             var resultSet = statement.executeQuery()) {
+            
+            var meta = resultSet.getMetaData();
+            int colCount = meta.getColumnCount();
+            var cols = new java.util.ArrayList<String>();
+            for (int i = 1; i <= colCount; i++) {
+                cols.add(meta.getColumnLabel(i));
+            }
+
+            var rows = new java.util.ArrayList<Object[]>();
+            while (resultSet.next()) {
+                Object[] row = new Object[colCount];
+                for (int i = 1; i <= colCount; i++) {
+                    row[i - 1] = resultSet.getObject(i);
+                }
+                rows.add(row);
+            }
+            long elapsed = System.currentTimeMillis() - startTime;
+            return new QueryResult(cols, rows, rows.size(), elapsed);
+        } catch (Exception e) {
+            throw new DAOException(e);
         }
     }
 }

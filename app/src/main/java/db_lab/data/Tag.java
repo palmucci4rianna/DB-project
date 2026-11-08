@@ -55,7 +55,12 @@ public final class Tag {
                 while (resultSet.next()) {
                     // 3-a. For each row we read the data we need and create a tag
                     //      out of it.
-                    var tagName = resultSet.getString("tag_name");
+                    String tagName;
+                    try {
+                        tagName = resultSet.getString("tag_name");
+                    } catch (SQLException e) {
+                        tagName = resultSet.getString(1);
+                    }
                     var tag = new Tag(tagName);
                     tags.add(tag);
                 }

@@ -55,9 +55,24 @@ public final class Material {
                 var resultSet = statement.executeQuery();
             ) {
                 while (resultSet.next()) {
-                    var code = resultSet.getInt("MATERIAL.code");
-                    var description = resultSet.getString("MATERIAL.description");
-                    var percent = resultSet.getFloat("COMPOSITION.percent");
+                    int code;
+                    try {
+                        code = resultSet.getInt("code");
+                    } catch (SQLException e) {
+                        code = resultSet.getInt(1);
+                    }
+                    String description;
+                    try {
+                        description = resultSet.getString("description");
+                    } catch (SQLException e) {
+                        description = resultSet.getString(2);
+                    }
+                    float percent;
+                    try {
+                        percent = resultSet.getFloat("percent");
+                    } catch (SQLException e) {
+                        percent = resultSet.getFloat(3);
+                    }
                     var material = new Material(code, description);
                     materials.put(material, percent);
                 }

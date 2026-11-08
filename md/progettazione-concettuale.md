@@ -115,7 +115,7 @@ Come prescritto dalla metodologia accademica di Basi di Dati, i requisiti espres
 #### 6. Template e Checklist Organizzativa
 - L'amministratore configura i modelli di pianificazione (Template Checklist) suddivisi per tipologia di rito, composti da voci di template con titolo, descrizione, priorità, fase organizzativa e giorni di anticipo rispetto all'evento (`giorni_prima`).
 - All'apertura dell'evento viene creata la checklist operativa (1:1 con l'evento). Le attività della checklist vengono derivate automaticamente calcolando la scadenza precisa:
-  $$\text{Scadenza} = \text{EVENTO.Data} - \text{VOCE_TEMPLATE.GiorniPrima}$$
+  $$\text{Scadenza} = \text{EVENTO.Data} - \text{VOCE\_TEMPLATE.GiorniPrima}$$
 - Ciascuna attività della checklist traccia la data di completamento effettiva (`DataCompletamento`), consentendo il calcolo metrico dei ritardi rispetto alla scadenza.
 
 #### 7. Lista Nozze, Regali e Quote
@@ -713,7 +713,7 @@ La timeline organizza lo svolgimento cronologico minuto per minuto della giornat
 4. **Quadratura Contratto:** $\text{CONTRATTO.Acconto} + \text{CONTRATTO.Saldo} = \text{CONTRATTO.ImportoDefinitivo}$.
 
 ### 3. Vincoli su Checklist, Timeline e Logistica
-1. **Scadenza Checklist:** $\text{ATTIVITA_CHECKLIST.Scadenza} = \text{EVENTO.Data} - \text{VOCE_TEMPLATE.GiorniPrima} \le \text{EVENTO.Data}$.
+1. **Scadenza Checklist:** $\text{ATTIVITA\_CHECKLIST.Scadenza} = \text{EVENTO.Data} - \text{VOCE\_TEMPLATE.GiorniPrima} \le \text{EVENTO.Data}$.
 2. **Ritardo Effettivo Checklist:** Se un'attività ha `Stato = 'completata'`, deve avere `DataCompletamento` valorizzata. Se $\text{DataCompletamento} > \text{Scadenza}$, l'attività è formalmente in ritardo.
 3. **Sequenzialità Timeline:** Tutte le attività orarie devono svolgersi nel giorno dell'evento senza sovrapposizioni incongruenti per la stessa location o per lo stesso coordinatore on-site.
 4. **Capienza Location:** $\text{EVENTO.NInvitatiConfermati} \le \min_{l \in \text{Location}} (l.\text{CapienzaMax})$.

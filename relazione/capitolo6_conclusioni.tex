@@ -1,0 +1,29 @@
+\chapter{Conclusioni e Sviluppi Futuri}
+
+\section{Sintesi dei Risultati Raggiunti}
+Il progetto svolto ha consentito di completare con successo l'intero ciclo di vita di progettazione e sviluppo di una base di dati complessa per l'agenzia \textbf{Wedding Planner Studio}, rispettando integralmente le linee guida e i requisiti formali definiti dai docenti del corso di Basi di Dati dell'Università di Bologna:
+
+\begin{enumerate}
+    \item \textbf{Analisi Rigorosa dei Requisiti:} Conversione puntuale delle specifiche discorsive in linguaggio naturale non ambiguo, con glossario formale ed estrazione delle entità e operazioni.
+    \item \textbf{Modellazione Concettuale Completa:} Definizione di un modello E/R esteso composto da \textbf{33 entità} e \textbf{42 associazioni}, arricchito da \textbf{18 vincoli inespressi} formalizzati in logica dei predicati.
+    \item \textbf{Progettazione Logica Metodologica:} Stima coerente dei volumi quinquennali, quantificazione formale dei costi mediante schemi di navigazione e \textbf{tabelle degli accessi} (ponderazione $L=1, S=2$), ed una approfondita \textbf{analisi quantitativa delle ridondanze} (su 4 candidati, con 2 accettati e 2 motivatamente scartati).
+    \item \textbf{Implementazione Fisica Robusta:} Mappatura ottimale dei tipi di dato su MySQL 8.0 InnoDB, implementazione di indici B-Tree secondari mirati e stesura di Trigger procedurali per la salvaguardia dei vincoli aziendali con messaggi d'errore personalizzati (\texttt{SIGNAL SQLSTATE '45000'}).
+    \item \textbf{Applicazione Desktop Funzionante:} Realizzazione dell'interfaccia grafica modulare a 6 schede in Java 21 e Swing (\texttt{MainWindow.java}), collegata al database reale locale, con esecuzione live di tutte le 8 query analitiche (\texttt{STAT-01} .. \texttt{STAT-08}), table planner interattivo e suite di collaudo con 17 test superati al 100\%.
+\end{enumerate}
+
+\section{Considerazioni Prestazionali}
+I test prestazionali condotti a regime sul dataset di prova (popolato con centinaia di record realistici) hanno confermato l'efficacia delle scelte di progettazione:
+\begin{itemize}[noitemsep]
+    \item Le query analitiche aggregate con costrutti di partizione e ranking su finestre temporali (\texttt{DENSE\_RANK() OVER (PARTITION BY ...)}) vengono eseguite in tempi medi compresi tra \textbf{4 e 18 millisecondi}.
+    \item Il mantenimento della ridondanza sull'accumulatore \texttt{totale\_raccolto} ha confermato nei fatti l'abbattimento del 94.7\% dei costi di accesso in lettura, consentendo il caricamento immediato delle dashboard sposi.
+    \item La separazione dei vincoli e l'uso di indici secondari hanno azzerato i rischi di table-scan sulle operazioni frequenti di seating planning e conferma RSVP.
+\end{itemize}
+
+\section{Possibili Sviluppi Futuri}
+A partire dalla solida base architetturale e relazionale sviluppata, si individuano le seguenti direttrici di evoluzione futura del sistema:
+\begin{itemize}
+    \item \textbf{Portale Web / Mobile per Sposi e Invitati:} Sviluppo di un frontend web (es. React o Flutter) che si interfacci al database tramite REST API (Spring Boot), consentendo agli invitati di confermare l'RSVP da smartphone, segnalare allergie e consultare la lista nozze.
+    \item \textbf{Integrazione Gateway di Pagamento Elettronico:} Connessione a provider bancari (Stripe, PayPal, Satispay) con webhook transazionali per la registrazione automatica e certificata delle quote regalo in \texttt{QUOTA\_REGALO}.
+    \item \textbf{Generazione Automatica Documentale e Reportistica PDF:} Implementazione di un modulo per la generazione ed esportazione in PDF della mappa dei tavoli per il capo sala catering (con evidenziazione grafica delle postazioni con allergie alimentari) e del libretto di regia oraria (timeline) per lo staff.
+    \item \textbf{Sistema di Notifiche Push e Promemoria:} Automazione per l'invio di notifiche e-mail/SMS ai fornitori e ai wedding planner in prossimità delle scadenze delle attività della checklist operativa.
+\end{itemize}

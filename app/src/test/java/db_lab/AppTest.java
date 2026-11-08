@@ -27,7 +27,24 @@ public final class AppTest {
 
     @BeforeClass
     public static void setup() throws SQLException {
-        connection = DAOUtils.localMySQLConnection("palmucciarianna", "root", "");
+        try {
+            connection = DAOUtils.localMySQLConnection("palmucciarianna", "root", "");
+        } catch (Exception e) {
+            // Se il database non esiste ancora sul server MySQL locale, crealo automaticamente
+            try (var adminConn = java.sql.DriverManager.getConnection(
+                    "jdbc:mysql://localhost:3306/?allowPublicKeyRetrieval=true&useSSL=false", "root", "")) {
+                try (var s = adminConn.createStatement()) {
+                    s.executeUpdate("CREATE DATABASE IF NOT EXISTS palmucciarianna CHARACTER SET utf8mb4;");
+                    s.executeUpdate("USE palmucciarianna;");
+                    s.executeUpdate("CREATE TABLE IF NOT EXISTS TAG (name VARCHAR(100) NOT NULL PRIMARY KEY);");
+                    s.executeUpdate("CREATE TABLE IF NOT EXISTS MATERIAL (code INT NOT NULL PRIMARY KEY, description VARCHAR(255) NOT NULL);");
+                    s.executeUpdate("CREATE TABLE IF NOT EXISTS PRODUCT (code INT NOT NULL PRIMARY KEY, name VARCHAR(100) NOT NULL, description TEXT);");
+                    s.executeUpdate("CREATE TABLE IF NOT EXISTS COMPOSITION (product_code INT NOT NULL, material_code INT NOT NULL, percent FLOAT NOT NULL, PRIMARY KEY(product_code, material_code));");
+                    s.executeUpdate("CREATE TABLE IF NOT EXISTS TAGGED (product_code INT NOT NULL, tag_name VARCHAR(100) NOT NULL, PRIMARY KEY(product_code, tag_name));");
+                }
+            }
+            connection = DAOUtils.localMySQLConnection("palmucciarianna", "root", "");
+        }
 
         // We do everything inside a transaction so that we won't pollute the
         // database with test data.

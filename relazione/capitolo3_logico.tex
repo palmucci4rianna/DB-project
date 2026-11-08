@@ -1,0 +1,369 @@
+\chapter{Progettazione Logica}
+
+\section{Introduzione e Metodologia di Progettazione Logica}
+La progettazione logica ha l'obiettivo di trasformare lo schema concettuale E/R in uno schema relazionale normalizzato, efficiente e direttamente implementabile sul motore relazionale \textbf{MySQL 8.0 (InnoDB)}.
+
+La metodologia accademica del corso prevede i seguenti passaggi formali:
+\begin{enumerate}
+    \item Stima dei volumi dei dati a regime.
+    \item Definizione della tabella delle operazioni e stima delle frequenze d'esecuzione.
+    \item Elaborazione degli schemi di navigazione e delle \textbf{tabelle degli accessi} con calcolo del costo computazionale (assegnando peso $L=1$ alle letture e $S=2$ alle scritture).
+    \item \textbf{Analisi quantitativa e critica delle ridondanze}, confrontando i costi degli schemi con e senza dato derivato.
+    \item Raffinamento dello schema E/R (eliminazione gerarchie IS-A, rimozione identificatori esterni).
+    \item Definizione dello schema relazionale finale e traduzione formale delle interrogazioni SQL.
+\end{enumerate}
+
+\section{Stima dei Volumi dei Dati}
+Si assume uno scenario operativo reale per un'agenzia consolidata attiva sul mercato da \textbf{5 anni}, con un flusso medio a regime di \textbf{40 matrimoni all'anno} (200 matrimoni storicizzati nel sistema). La Tabella~\ref{tab:volumi} illustra i volumi stimati per le 33 entità del dominio.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l p{2.5cm} r X}
+\toprule
+\textbf{Concetto / Entità} & \textbf{Tipologia} & \textbf{Volume (Tuple)} & \textbf{Criteri di Stima e Motivazione} \\
+\midrule
+\texttt{PERSONA} & Forte (Radice IS-A) & 26.000 & 500 Coniugi, 10 Dipendenti, 25.490 Invitati unici. \\
+\texttt{COPPIA} & Forte & 250 & 200 matrimoni chiusi + 50 coppie in trattativa/pianificazione. \\
+\texttt{DIPENDENTE} & Specializzazione & 10 & Personale di staff dell'agenzia. \\
+\texttt{RUOLO} & Forte & 4 & Mansioni contrattuali codificate. \\
+\texttt{RUOLO\_DIPENDENTE} & Reificazione $N:M$ & 16 & Media di 1.6 ruoli per dipendente. \\
+\texttt{MOTIVO\_ASSENZA} & Forte & 8 & Categorie assenza (ferie, malattia, congedo, ecc.). \\
+\texttt{DISPONIBILITA} & Debole da Dip. & 400 & Storico assenze (8 periodi/anno per dipendente in 5 anni). \\
+\texttt{ASSEGNAZIONE\_DIP.} & Reificazione $N:M$ & 320 & Storico planner assegnati alle coppie (con riassegnazioni). \\
+\texttt{EVENTO} & Debole da Coppia & 200 & 40 matrimoni/anno $\times$ 5 anni. \\
+\texttt{LOCATION} & Forte & 25 & Strutture convenzionate (ville, castelli, casali). \\
+\texttt{SVOLGIMENTO\_EVENTO}& Reificazione $N:M$ & 400 & Media di 2 location utilizzate per evento (rito + ricevimento). \\
+\texttt{TAVOLO} & Debole da Evento & 2.400 & Media di 12 tavoli per ricevimento. \\
+\texttt{BOMBONIERA} & Forte & 12 & Tipologie bomboniera a catalogo. \\
+\texttt{CATEGORIA\_FORNITORE}& Forte & 8 & Settori merceologici (catering, foto, musica, fiori, abiti). \\
+\texttt{FORNITORE} & Forte & 60 & Imprese partner accreditate (7--8 partner per categoria). \\
+\texttt{COLLABORAZIONE} & Debole da Forn. & 120 & Contratti biennali di convenzione rinnovati. \\
+\texttt{PREVENTIVO} & Debole (1:N Evento)& 1.200 & Media di 6 preventivi richiesti per matrimonio. \\
+\texttt{CONTRATTO} & Debole (1:1 Prev.) & 600 & Tasso di conversione del 50\% (3 contratti stipulati per evento). \\
+\texttt{TIMELINE} & Debole (1:1 Evento)& 200 & Esattamente 1 timeline di regia oraria per evento. \\
+\texttt{ATTIVITA\_TIMELINE} & Debole da Timeline & 2.400 & Media di 12 momenti scaletta oraria per evento. \\
+\texttt{TEMPLATE\_CHECKLIST}& Forte & 6 & Modelli standard per tipologia di rito. \\
+\texttt{VOCE\_TEMPLATE} & Debole da Template & 180 & Media di 30 compiti codificati per template. \\
+\texttt{CHECKLIST} & Debole (1:1 Evento)& 200 & Esattamente 1 checklist operativa per evento. \\
+\texttt{ATTIVITA\_CHECKLIST}& Debole da Check. & 6.000 & 30 compiti operativi monitorati per matrimonio. \\
+\texttt{LISTA\_NOZZE} & Debole (1:1 Evento)& 200 & Esattamente 1 lista nozze per evento. \\
+\texttt{REGALO} & Debole da Lista & 1.600 & Media di 8 articoli o quote desiderate inserite per lista. \\
+\texttt{INVITATO} & Specializzazione & 25.000 & Anagrafica globale degli ospiti invitati. \\
+\texttt{PARTECIPAZIONE} & Reificazione $N:M$ & 25.500 & Media di ~127 invitati a matrimonio (alcuni ricorrenti). \\
+\texttt{QUOTA\_REGALO} & Reificazione $N:M$ & 10.000 & Circa 50 donazioni/quote versate per evento. \\
+\texttt{COMUNICAZIONE} & Debole da Coppia & 3.000 & Media di 12 comunicazioni formali archiviate per coppia. \\
+\texttt{APPUNTAMENTO} & Debole da Coppia & 1.250 & Media di 5 incontri di consulenza per coppia. \\
+\texttt{RECENSIONE} & Debole (1:1 Evento)& 180 & Tasso di rilascio recensione del 90\% su eventi conclusi. \\
+\texttt{FOTO} & Debole da Evento & 1.800 & Media di 9 fotografie ufficiali a portfolio per matrimonio. \\
+\bottomrule
+\end{tabularx}
+\caption{Tavola dei volumi stimati per le entità del dominio a regime quinquennale.}
+\label{tab:volumi}
+\end{table}
+
+\section{Tabella delle Operazioni e Frequenze}
+Le operazioni del sistema vengono classificate in \textbf{Interattive (I)} per le transazioni OLTP di routine e \textbf{Batch (B)} per le elaborazioni analitiche direzionali (Tabella~\ref{tab:operazioni}).
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l p{7.5cm} c r}
+\toprule
+\textbf{Codice} & \textbf{Descrizione Operazione} & \textbf{Tipo} & \textbf{Frequenza ($F_{\text{anno}}$)} \\
+\midrule
+\texttt{OP-01} & Registrazione nuova coppia con due coniugi e assegnazione wedding planner & I & 24 / anno \\
+\texttt{OP-02} & Creazione evento con budget ed associazione location e fasce orarie & I & 24 / anno \\
+\texttt{OP-03} & Istanziazione automatica checklist operativa a partire dal template di rito & I & 24 / anno \\
+\texttt{OP-04} & Inserimento fornitore nel catalogo e associazione categoria & I & 12 / anno \\
+\texttt{OP-05} & Emissione richiesta preventivo a fornitore per un matrimonio & I & 240 / anno \\
+\texttt{OP-06} & Accettazione preventivo, stipula contratto e registrazione acconto & I & 120 / anno \\
+\texttt{OP-07} & Censimento invitato e registrazione partecipazione (RSVP, allergie, menù) & I & 2.400 / anno \\
+\texttt{OP-08} & Conferma presenza invitato ed assegnazione posto al tavolo & I & 1.200 / anno \\
+\texttt{OP-09} & Inserimento nuovo articolo regalo nella lista nozze & I & 360 / anno \\
+\texttt{OP-10} & Registrazione donazione/quota regalo con messaggio auguri da invitato & I & 1.800 / anno \\
+\texttt{OP-11} & Chiusura task checklist con data completamento effettiva & I & 1.200 / anno \\
+\texttt{OP-12} & Inserimento voce nella timeline di regia oraria con responsabile & I & 480 / anno \\
+\texttt{OP-13} & Registrazione recensione e caricamento foto portfolio a evento concluso & I & 36 / anno \\
+\midrule
+\texttt{STAT-01}& Fornitori maggiormente contrattualizzati per categoria e spesa media & B & 12 / anno (mensile) \\
+\texttt{STAT-02}& Monitoraggio scostamento budget (Variance Analysis) su eventi attivi & B & 48 / anno (settim.) \\
+\texttt{STAT-03}& Tasso di conversione preventivi in contratti per fornitore & B & 12 / anno (mensile) \\
+\texttt{STAT-04}& Analisi saturazione e capienza tavoli per ricevimento & B & 48 / anno (settim.) \\
+\texttt{STAT-05}& Avanzamento checklist operativa e tassi di ritardo per fase temporale & B & 48 / anno (settim.) \\
+\texttt{STAT-06}& Distribuzione regali e stato di progressione lista nozze & B & 24 / anno \\
+\texttt{STAT-07}& Profilassi allergenica e statistiche menù catering & B & 48 / anno (settim.) \\
+\texttt{STAT-08}& Ospiti ricorrenti e generosità donazioni su matrimoni multipli & B & 24 / anno \\
+\bottomrule
+\end{tabularx}
+\caption{Tavola delle operazioni principali e relative frequenze stimate.}
+\label{tab:operazioni}
+\end{table}
+
+\section{Schemi di Navigazione e Tabelle degli Accessi}
+Il calcolo formale del costo computazionale adotta le seguenti convenzioni didattiche:
+\begin{itemize}[noitemsep]
+    \item Ogni accesso in Lettura ($L$) equivale a un costo unitario di \textbf{1}.
+    \item Ogni accesso in Scrittura ($S$), che comporta inserimento, cancellazione o modifica su disco con aggiornamento degli indici e log transazionale, equivale a un costo unitario di \textbf{2}.
+    \item Costo Annuo $= \text{Costo Singola Esecuzione} \times F_{\text{anno}}$.
+\end{itemize}
+
+\subsection{Operazione OP-08: Conferma RSVP e Assegnazione Tavolo}
+\textbf{Descrizione:} Dato un invitato (CF) e un matrimonio, si legge la partecipazione, si verifica la capienza residua del tavolo designato e si aggiorna lo stato su \texttt{'CONFERMATO'} assegnando il tavolo. Frequenza $F = 1.200 \text{ volte/anno}$.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{l c c c c l}
+\toprule
+\textbf{Entità / Tabella} & \textbf{Tipo Accesso} & \textbf{Accessi} & \textbf{Costo Unitario} & \textbf{Costo Parziale} & \textbf{Note} \\
+\midrule
+\texttt{PARTECIPAZIONE} & L & 1 & 1 & 1 & Lettura riga ospite per l'evento \\
+\texttt{TAVOLO} & L & 1 & 1 & 1 & Lettura capienza massima tavolo \\
+\texttt{PARTECIPAZIONE} & L & 10 & 1 & 10 & Lettura ospiti già assegnati al tavolo \\
+\texttt{PARTECIPAZIONE} & S & 1 & 2 & 2 & Scrittura stato confermato e tavolo \\
+\midrule
+\textbf{Totale Singolo} & & & & \textbf{14} & \\
+\textbf{Totale Annuo} & & & & \textbf{16.800} & $14 \times 1.200 \text{ esecuzioni/anno}$ \\
+\bottomrule
+\end{tabular}
+\caption{Tabella degli accessi per l'operazione \texttt{OP-08}.}
+\end{table}
+
+\subsection{Operazione OP-10: Registrazione Quota Regalo da Invitato}
+\textbf{Descrizione:} Un invitato effettua un versamento per la lista nozze. Il sistema accerta l'identità dell'ospite, verifica la presenza dell'invito per quel matrimonio e registra la quota monetaria. Frequenza $F = 1.800 \text{ volte/anno}$.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{l c c c c l}
+\toprule
+\textbf{Entità / Tabella} & \textbf{Tipo Accesso} & \textbf{Accessi} & \textbf{Costo Unitario} & \textbf{Costo Parziale} & \textbf{Note} \\
+\midrule
+\texttt{INVITATO} & L & 1 & 1 & 1 & Controllo anagrafica ospite \\
+\texttt{PARTECIPAZIONE} & L & 1 & 1 & 1 & Verifica invito valido per l'evento \\
+\texttt{REGALO} & L & 1 & 1 & 1 & Lettura prezzo target (se regalo specifico) \\
+\texttt{QUOTA\_REGALO} & L & 6 & 1 & 6 & Lettura quote già versate per l'articolo \\
+\texttt{QUOTA\_REGALO} & S & 1 & 2 & 2 & Inserimento record quota regalo \\
+\midrule
+\textbf{Totale Singolo} & & & & \textbf{11} & \\
+\textbf{Totale Annuo} & & & & \textbf{19.800} & $11 \times 1.800 \text{ esecuzioni/anno}$ \\
+\bottomrule
+\end{tabular}
+\caption{Tabella degli accessi per l'operazione \texttt{OP-10}.}
+\end{table}
+
+\subsection{Operazione STAT-02: Monitoraggio Scostamento Budget (Variance Analysis)}
+\textbf{Descrizione:} Elaborazione analitica settimanale ($F = 48 \text{ volte/anno}$) che analizza i 40 matrimoni attivi in pianificazione, sommando contratti fornitore e costi di affitto location per confrontarli con il budget stanziato.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{l c c c c l}
+\toprule
+\textbf{Entità / Tabella} & \textbf{Tipo Accesso} & \textbf{Accessi} & \textbf{Costo Unitario} & \textbf{Costo Parziale} & \textbf{Note} \\
+\midrule
+\texttt{EVENTO} & L & 40 & 1 & 40 & Scansione dei 40 eventi attivi \\
+\texttt{PREVENTIVO} & L & 240 & 1 & 240 & 6 preventivi medi per evento ($40 \times 6$) \\
+\texttt{CONTRATTO} & L & 120 & 1 & 120 & 3 contratti stipulati per evento ($40 \times 3$) \\
+\texttt{SVOLGIMENTO\_EVENTO} & L & 80 & 1 & 80 & 2 location per evento ($40 \times 2$) \\
+\texttt{LOCATION} & L & 80 & 1 & 80 & Lettura costo affitto location \\
+\midrule
+\textbf{Totale Singolo} & & & & \textbf{560} & \\
+\textbf{Totale Annuo} & & & & \textbf{26.880} & $560 \times 48 \text{ esecuzioni/anno}$ \\
+\bottomrule
+\end{tabular}
+\caption{Tabella degli accessi per l'operazione \texttt{STAT-02}.}
+\end{table}
+
+\section{Analisi Critica delle Ridondanze}
+In conformità alle direttive del corso, sono stati sottoposti a rigorosa analisi quantitativa quattro attributi candidati di ridondanza, confrontando sistematicamente lo Schema $S_1$ (senza ridondanza) e lo Schema $S_2$ (con ridondanza).
+
+\subsection{Ridondanza 1 (ACCETTATA): Totale Raccolto in LISTA\_NOZZE}
+\begin{itemize}[noitemsep]
+    \item \textbf{Dato Derivabile:} $\text{LISTA\_NOZZE.totale\_raccolto} = \sum_{q \in \text{QUOTA\_REGALO}} q.\text{importo}$.
+    \item \textbf{Operazioni coinvolte:} 
+    \begin{itemize}[noitemsep]
+        \item $OP_A$: Registrazione quota regalo (\texttt{OP-10}, $F_A = 1.800 \text{ volte/anno}$).
+        \item $OP_B$: Visualizzazione lista nozze da portale sposi o invitati ($F_B = 5.400 \text{ volte/anno}$).
+    \end{itemize}
+\end{itemize}
+
+\textbf{Calcolo dei Costi Comparativi:}
+\begin{itemize}
+    \item \textbf{Schema $S_1$ (Senza Ridondanza):}
+    \begin{itemize}[noitemsep]
+        \item Scrittura ($OP_A$): Inserimento in \texttt{QUOTA\_REGALO} ($1 \text{ scrittura } = 2$). Costo annuo: $2 \times 1.800 = \mathbf{3.600}$.
+        \item Lettura ($OP_B$): Scansione delle 50 quote versate in media per evento ($50 \text{ letture } = 50$). Costo annuo: $50 \times 5.400 = \mathbf{270.000}$.
+        \item \textbf{Costo Totale Annuo $S_1$:} $3.600 + 270.000 = \mathbf{273.600}$.
+    \end{itemize}
+    \item \textbf{Schema $S_2$ (Con Ridondanza):}
+    \begin{itemize}[noitemsep]
+        \item Scrittura ($OP_A$): Inserimento quota ($2$) + lettura tupla lista ($1$) + aggiornamento accumulatore lista ($2$) = $5$. Costo annuo: $5 \times 1.800 = \mathbf{9.000}$.
+        \item Lettura ($OP_B$): Accesso diretto al valore precalcolato nella tupla \texttt{LISTA\_NOZZE} ($1 \text{ lettura } = 1$). Costo annuo: $1 \times 5.400 = \mathbf{5.400}$.
+        \item \textbf{Costo Totale Annuo $S_2$:} $9.000 + 5.400 = \mathbf{14.400}$.
+    \end{itemize}
+\end{itemize}
+
+\[ \Delta \text{Costo} = 273.600 - 14.400 = \mathbf{+259.200 \text{ accessi/anno risparmiati (-94.7\%)}} \]
+
+\textbf{Decisione Formale: ACCETTATA.} Il risparmio computazionale è imponente; la sincronizzazione è garantita tramite Trigger atomico \texttt{trg\_quota\_aggiorna\_totale}.
+
+\subsection{Ridondanza 2 (SCARTATA): Costo Totale Impegnato in EVENTO}
+\begin{itemize}[noitemsep]
+    \item \textbf{Dato Derivabile:} Somma dei contratti stipulati e canoni location:
+    $\text{CostoImpegnato} = \sum c.\text{importo\_concordato} + \sum l.\text{costo\_affitto}$.
+    \item \textbf{Operazioni coinvolte:} Modifica contrattuale/location ($F = 180 \text{ volte/anno}$) e reportistica budget ($F = 148 \text{ volte/anno}$).
+\end{itemize}
+
+\textbf{Valutazione Comparativa:}
+Sebbene l'aritmetica evidenzi un risparmio teorico ($29.960$ vs $6.820$), \textbf{la ridondanza viene respinta per ragioni di architettura}:
+\begin{enumerate}[noitemsep]
+    \item L'attributo dipende da due tabelle distinte (\texttt{CONTRATTO} e \texttt{SVOLGIMENTO\_EVENTO}), moltiplicando i trigger necessari e aumentando il rischio di lock concorrenti durante le stipule.
+    \item La lettura avviene quasi esclusivamente in una procedura batch settimanale, dove una query aggregata garantisce assoluta consistenza finanziaria senza alcun impatto percettibile.
+\end{enumerate}
+
+\subsection{Ridondanza 3 (SCARTATA): Posti Occupati in TAVOLO}
+\begin{itemize}[noitemsep]
+    \item \textbf{Dato Derivabile:} $\text{COUNT}(p \in \text{PARTECIPAZIONE} : p.\text{tavolo} = t)$.
+    \item \textbf{Valutazione:} Mantenere un contatore denormalizzato su \texttt{TAVOLO} comporterebbe un lock esclusivo sulla riga del tavolo ad ogni assegnazione posto. Poiché ciascun tavolo ospita mediamente solo 10 persone, la query \texttt{COUNT(*)} indicizzata impegna meno di 0.1 ms. La ridondanza viene **SCARTATA** per non creare colli di bottiglia di concorrenza nella GUI.
+\end{itemize}
+
+\subsection{Ridondanza 4 (ACCETTATA): Flag Completato in REGALO}
+\begin{itemize}[noitemsep]
+    \item \textbf{Dato Derivabile:} Flag \texttt{'S'/'N'} indicante se la somma delle quote copre il prezzo: $\sum q.\text{importo} \ge r.\text{prezzo}$.
+    \item \textbf{Valutazione:} Durante la navigazione della lista regali da parte degli invitati ($5.400 \text{ accessi/anno}$), filtrare i regali completati senza il flag richiederebbe una complessa \texttt{LEFT JOIN} con \texttt{GROUP BY} e \texttt{HAVING} su tutte le quote (costo annuo $316.800$). Con il flag ridondante indicizzato, la lettura costa $43.200$. Risparmio: $\mathbf{+269.388 \text{ accessi/anno (-85.0\%)}}$.
+    \item \textbf{Decisione Formale: ACCETTATA}, aggiornata dal trigger delle quote.
+\end{itemize}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\textwidth}{l p{3.8cm} c c X}
+\toprule
+\textbf{Ridondanza} & \textbf{Entità Destinazione} & \textbf{Costo $S_1$} & \textbf{Costo $S_2$} & \textbf{Esito e Motivazione} \\
+\midrule
+\texttt{totale\_raccolto} & \texttt{LISTA\_NOZZE} & 273.600 & 14.400 & \textbf{ACCETTATA:} Riduce gli accessi del 94.7\% in visualizzazione lista. \\
+\addlinespace
+\texttt{costo\_impegnato} & \texttt{EVENTO} & 29.960 & 6.820 & \textbf{SCARTATA:} Evita trigger multipli e rischi di disallineamento contabile. \\
+\addlinespace
+\texttt{posti\_occupati} & \texttt{TAVOLO} & 14.400 & 10.800 & \textbf{SCARTATA:} Previene lock di riga concorrenti durante il seating planning. \\
+\addlinespace
+\texttt{completato} & \texttt{REGALO} & 316.800 & 47.412 & \textbf{ACCETTATA:} Elimina pesanti aggregazioni runtime nel catalogo regali. \\
+\bottomrule
+\end{tabularx}
+\caption{Quadro sinottico dell'analisi quantitativa delle ridondanze.}
+\label{tab:quadro_ridondanze}
+\end{table}
+
+\section{Raffinamento e Ristrutturazione dello Schema E/R}
+\subsection{Eliminazione delle Gerarchie di Generalizzazione (IS-A)}
+La gerarchia avente come radice \texttt{PERSONA} e figli \texttt{DIPENDENTE} e \texttt{INVITATO} è stata ristrutturata come segue:
+\begin{itemize}
+    \item \textbf{Sottotipo INVITATO:} Possiede pochi attributi specifici (\texttt{rapporto\_parentela}, \texttt{nucleo\_familiare}) e partecipa ad associazioni ad altissima frequenza. Si è adottato il \textbf{collasso verso l'alto parziale / sostituzione con associazione}: \texttt{PERSONA} conserva le generalità anagrafiche, mentre la tabella \texttt{INVITATO} estende \texttt{PERSONA} tramite FK primaria su \texttt{codice\_fiscale}.
+    \item \textbf{Sottotipo DIPENDENTE:} Ha numerose associazioni esclusive (\texttt{RUOLO\_DIPENDENTE}, \texttt{DISPONIBILITA}, \texttt{ASSEGNAZIONE\_DIPENDENTE}). È stata adottata la \textbf{sostituzione con associazione}: entità autonoma \texttt{DIPENDENTE} con PK \texttt{codice\_fiscale} in integrità referenziale su \texttt{PERSONA}.
+\end{itemize}
+
+\subsection{Eliminazione degli Identificatori Esterni}
+Le entità deboli concettuali sono state tradotte importando le chiavi primarie delle entità proprietarie:
+\begin{itemize}[noitemsep]
+    \item \texttt{EVENTO:} Assorbe la chiave della coppia $\rightarrow \text{PK} = \{\underline{\text{username\_coppia}, \text{data}}\}$.
+    \item \texttt{TAVOLO:} Debole da evento $\rightarrow \text{PK} = \{\underline{\text{username\_coppia}, \text{data\_evento}, \text{nome\_numero}}\}$.
+    \item \texttt{LISTA\_NOZZE, CHECKLIST, TIMELINE, RECENSIONE:} Relazioni 1:1 con evento $\rightarrow \text{PK} = \{\underline{\text{username\_coppia}, \text{data\_evento}}\}$.
+    \item \texttt{PREVENTIVO:} Debole da fornitore $\rightarrow \text{PK} = \{\underline{\text{fornitore\_piva}, \text{numero\_preventivo}}\}$ con FK verso evento.
+\end{itemize}
+
+\section{Schema Relazionale Finale}
+Si formalizza lo schema logico relazionale (chiavi primarie sottolineate, chiavi esterne con asterisco):
+
+\small
+\begin{enumerate}[noitemsep]
+    \item $\text{PERSONA}(\underline{\text{codice\_fiscale}}, \text{nome}, \text{cognome}, \text{email}, \text{telefono})$
+    \item $\text{COPPIA}(\underline{\text{username}}, \text{data\_prevista}, \text{budget\_indicativo}, \text{cf\_coniuge1}^*, \text{cf\_coniuge2}^*)$ \\
+    \textit{FK: $\text{cf\_coniuge1}, \text{cf\_coniuge2} \rightarrow \text{PERSONA}$; CHECK: $\text{cf\_coniuge1} < \text{cf\_coniuge2}$}
+    \item $\text{DIPENDENTE}(\underline{\text{codice\_fiscale}}^*, \text{email\_aziendale}, \text{data\_assunzione}, \text{data\_fine\_rapporto}, \text{stato})$ \\
+    \textit{FK: $\text{codice\_fiscale} \rightarrow \text{PERSONA}$}
+    \item $\text{RUOLO}(\underline{\text{nome\_ruolo}}, \text{descrizione}, \text{max\_eventi\_contemporanei})$
+    \item $\text{RUOLO\_DIPENDENTE}(\underline{\text{dipendente\_cf}}^*, \underline{\text{nome\_ruolo}}^*, \text{data\_assegnazione}, \text{principale})$
+    \item $\text{MOTIVO\_ASSENZA}(\underline{\text{categoria}}, \text{descrizione}, \text{remunerata})$
+    \item $\text{DISPONIBILITA}(\underline{\text{dipendente\_cf}}^*, \underline{\text{data\_inizio}}, \text{data\_fine}, \text{tipo}, \text{stato}, \text{categoria\_assenza}^*)$
+    \item $\text{ASSEGNAZIONE\_DIPENDENTE}(\underline{\text{username\_coppia}}^*, \underline{\text{dipendente\_cf}}^*, \underline{\text{data\_inizio}}, \text{data\_fine}, \text{motivo\_cambio}, \text{attiva})$
+    \item $\text{EVENTO}(\underline{\text{username\_coppia}}^*, \underline{\text{data}}, \text{budget\_effettivo}, \text{n\_invitati\_previsti}, \text{tipo\_cerimonia}, \text{tema\_stile}, \text{stato})$
+    \item $\text{LOCATION}(\underline{\text{nome\_location}}, \text{indirizzo}, \text{citta}, \text{capienza\_max}, \text{costo\_affitto}, \text{referente}, \text{telefono})$
+    \item $\text{SVOLGIMENTO\_EVENTO}(\underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \underline{\text{nome\_location}}^*, \underline{\text{fascia\_oraria}}, \text{tipo\_utilizzo})$
+    \item $\text{TAVOLO}(\underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \underline{\text{nome\_numero}}, \text{capienza}, \text{forma}, \text{zona\_sala})$
+    \item $\text{BOMBONIERA}(\underline{\text{tipologia}}, \text{descrizione}, \text{costo\_unitario})$
+    \item $\text{CATEGORIA\_FORNITORE}(\underline{\text{nome\_categoria}}, \text{descrizione})$
+    \item $\text{FORNITORE}(\underline{\text{partita\_iva}}, \text{ragione\_sociale}, \text{indirizzo}, \text{telefono}, \text{email}, \text{attivo}, \text{nome\_categoria}^*)$
+    \item $\text{COLLABORAZIONE}(\underline{\text{fornitore\_piva}}^*, \underline{\text{data\_inizio}}, \text{data\_fine}, \text{stato}, \text{commissione\_percentuale})$
+    \item $\text{PREVENTIVO}(\underline{\text{fornitore\_piva}}^*, \underline{\text{numero\_preventivo}}, \text{data\_emissione}, \text{data\_scadenza}, \text{importo}, \text{stato}, \text{username\_coppia}^*, \text{data\_evento}^*)$
+    \item $\text{CONTRATTO}(\underline{\text{fornitore\_piva}}^*, \underline{\text{numero\_preventivo}}^*, \text{data\_firma}, \text{importo\_concordato}, \text{acconto\_versato}, \text{stato\_pagamento})$
+    \item $\text{TIMELINE}(\underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \text{note\_generali})$
+    \item $\text{ATTIVITA\_TIMELINE}(\underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \underline{\text{orario\_previsto}}, \text{titolo\_attivita}, \text{ora\_inizio}, \text{ora\_fine}, \text{dipendente\_cf}^*)$
+    \item $\text{TEMPLATE\_CHECKLIST}(\underline{\text{id\_template}}, \text{nome\_template}, \text{descrizione}, \text{tipo\_rito})$
+    \item $\text{VOCE\_TEMPLATE}(\underline{\text{id\_template}}^*, \underline{\text{titolo\_voce}}, \text{descrizione}, \text{giorni\_prima\_evento}, \text{priorita}, \text{fase\_temporale})$
+    \item $\text{CHECKLIST}(\underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \text{id\_template}^*)$
+    \item $\text{ATTIVITA\_CHECKLIST}(\underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \underline{\text{titolo\_attivita}}, \text{scadenza}, \text{data\_completamento}, \text{priorita}, \text{fase\_temporale})$
+    \item $\text{LISTA\_NOZZE}(\underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \text{iban}, \text{banca}, \text{intestatario}, \text{totale\_raccolto}^{\text{RID}})$
+    \item $\text{REGALO}(\underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \underline{\text{descrizione}}, \text{prezzo}, \text{tipo\_frazionamento}, \text{completato}^{\text{RID}})$
+    \item $\text{INVITATO}(\underline{\text{codice\_fiscale}}^*, \text{rapporto\_parentela}, \text{nucleo\_familiare}, \text{tipologia\_bomboniera}^*)$
+    \item $\text{PARTECIPAZIONE}(\underline{\text{codice\_fiscale}}^*, \underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \text{stato}, \text{esigenze\_alimentari}, \text{intolleranze}, \text{menu\_scelto}, \text{tavolo\_nome\_numero}^*)$
+    \item $\text{QUOTA\_REGALO}(\underline{\text{codice\_fiscale}}^*, \underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \underline{\text{data\_ora}}, \text{importo}, \text{metodo\_pagamento}, \text{stato}, \text{descrizione\_regalo}^*)$
+    \item $\text{COMUNICAZIONE}(\underline{\text{id\_comunicazione}}, \text{username\_coppia}^*, \text{data\_ora}, \text{mittente}, \text{canale}, \text{oggetto}, \text{testo})$
+    \item $\text{APPUNTAMENTO}(\underline{\text{id\_appuntamento}}, \text{username\_coppia}^*, \text{dipendente\_cf}^*, \text{data\_ora}, \text{luogo}, \text{stato})$
+    \item $\text{RECENSIONE}(\underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \text{data}, \text{voto}, \text{testo}, \text{tag\_stile})$
+    \item $\text{FOTO}(\underline{\text{username\_coppia}}^*, \underline{\text{data\_evento}}^*, \underline{\text{percorso\_file}}, \text{didascalia}, \text{autore}, \text{data\_scatto})$
+\end{enumerate}
+\normalsize
+
+\section{Interrogazioni SQL Analitiche (STAT-01 .. STAT-08)}
+Di seguito si riportano due delle query più significative tra le 8 implementate ed eseguite dal sistema:
+
+\subsection{STAT-01: Fornitori Maggiormente Contrattualizzati e Spesa Media}
+\begin{lstlisting}
+SELECT 
+    f.nome_categoria AS Categoria,
+    f.partita_iva AS PartitaIVA,
+    f.ragione_sociale AS Fornitore,
+    COUNT(c.numero_preventivo) AS NumeroContrattiStipulati,
+    COALESCE(SUM(c.importo_concordato), 0.00) AS TotaleFatturato,
+    ROUND(COALESCE(AVG(c.importo_concordato), 0.00), 2) AS SpesaMediaPerContratto,
+    DENSE_RANK() OVER (
+        PARTITION BY f.nome_categoria 
+        ORDER BY COUNT(c.numero_preventivo) DESC, SUM(c.importo_concordato) DESC
+    ) AS PosizioneClassifica
+FROM FORNITORE f
+LEFT JOIN PREVENTIVO p 
+    ON f.partita_iva = p.fornitore_piva
+LEFT JOIN CONTRATTO c 
+    ON p.numero_preventivo = c.numero_preventivo 
+   AND p.fornitore_piva = c.fornitore_piva
+WHERE f.attivo = 'S'
+GROUP BY f.nome_categoria, f.partita_iva, f.ragione_sociale
+ORDER BY f.nome_categoria, PosizioneClassifica;
+\end{lstlisting}
+
+\subsection{STAT-02: Monitoraggio Scostamento Budget (Variance Analysis)}
+\begin{lstlisting}
+SELECT 
+    e.username_coppia AS Coppia,
+    e.data AS DataEvento,
+    e.budget_effettivo AS BudgetAllocato,
+    COALESCE(SUM(DISTINCT l.costo_affitto), 0.00) AS CostoLocation,
+    COALESCE(SUM(c.importo_concordato), 0.00) AS CostoFornitori,
+    (COALESCE(SUM(DISTINCT l.costo_affitto), 0.00) + COALESCE(SUM(c.importo_concordato), 0.00)) AS TotaleImpegnato,
+    (e.budget_effettivo - (COALESCE(SUM(DISTINCT l.costo_affitto), 0.00) + COALESCE(SUM(c.importo_concordato), 0.00))) AS ResiduoMargine,
+    ROUND(((COALESCE(SUM(DISTINCT l.costo_affitto), 0.00) + COALESCE(SUM(c.importo_concordato), 0.00)) / e.budget_effettivo) * 100, 2) AS PercentualeConsumata
+FROM EVENTO e
+LEFT JOIN SVOLGIMENTO_EVENTO se 
+    ON e.username_coppia = se.username_coppia AND e.data = se.data_evento
+LEFT JOIN LOCATION l 
+    ON se.nome_location = l.nome_location
+LEFT JOIN PREVENTIVO p 
+    ON e.username_coppia = p.username_coppia AND e.data = p.data_evento
+LEFT JOIN CONTRATTO c 
+    ON p.numero_preventivo = c.numero_preventivo AND p.fornitore_piva = c.fornitore_piva
+WHERE e.stato IN ('in_pianificazione', 'confermato', 'completato')
+GROUP BY e.username_coppia, e.data, e.stato, e.budget_effettivo
+ORDER BY e.data ASC;
+\end{lstlisting}

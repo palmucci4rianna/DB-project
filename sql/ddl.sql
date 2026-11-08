@@ -417,7 +417,7 @@ CREATE TABLE PARTECIPAZIONE (
     CONSTRAINT fk_part_evento FOREIGN KEY (username_coppia, data_evento) 
         REFERENCES EVENTO (username_coppia, data) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_part_tavolo FOREIGN KEY (username_coppia, data_evento, tavolo_nome_numero) 
-        REFERENCES TAVOLO (username_coppia, data_evento, nome_numero) ON DELETE SET NULL ON UPDATE CASCADE,
+        REFERENCES TAVOLO (username_coppia, data_evento, nome_numero) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT chk_part_stato CHECK (stato IN ('CONFERMATO', 'RIFIUTATO', 'IN_ATTESA')),
     CONSTRAINT chk_part_tavolo_stato CHECK (tavolo_nome_numero IS NULL OR stato = 'CONFERMATO')
 ) ENGINE=InnoDB;
@@ -437,7 +437,7 @@ CREATE TABLE QUOTA_REGALO (
     CONSTRAINT fk_qr_partecipazione FOREIGN KEY (codice_fiscale, username_coppia, data_evento) 
         REFERENCES PARTECIPAZIONE (codice_fiscale, username_coppia, data_evento) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_qr_regalo FOREIGN KEY (username_coppia, data_evento, descrizione_regalo) 
-        REFERENCES REGALO (username_coppia, data_evento, descrizione) ON DELETE SET NULL ON UPDATE CASCADE,
+        REFERENCES REGALO (username_coppia, data_evento, descrizione) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT chk_qr_metodo CHECK (metodo_pagamento IN ('BONIFICO', 'CARTA', 'PAYPAL', 'CONTANTI')),
     CONSTRAINT chk_qr_stato CHECK (stato IN ('in_attesa', 'confermato', 'fallito', 'stornato')),
     CONSTRAINT chk_qr_importo CHECK (importo > 0)

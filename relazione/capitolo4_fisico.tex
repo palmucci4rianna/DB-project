@@ -1,0 +1,94 @@
+\chapter{Progettazione Fisica e Realizzazione Database}
+
+\section{Scelta del DBMS e Architettura di Memorizzazione}
+La base di dati è stata implementata sul motore relazionale \textbf{MySQL 8.0 Community Server}, adottando lo storage engine transazionale \textbf{InnoDB}. 
+InnoDB è stato scelto per le seguenti caratteristiche determinanti:
+\begin{itemize}[noitemsep]
+    \item Pieno supporto alle proprietà \textbf{ACID} (Atomicità, Consistenza, Isolamento, Durabilità) indispensabili per la gestione economica e contrattuale dell'agenzia.
+    \item Gestione nativa dell'integrità referenziale (\textit{Foreign Keys}) con politiche di cancellazione ed aggiornamento a cascata (\texttt{ON DELETE CASCADE / RESTRICT}).
+    \item Concorrenza multi-versione (\textbf{MVCC}) con \textit{row-level locking}, che previene colli di bottiglia durante l'accesso contemporaneo dei wedding planner.
+    \item Struttura di memorizzazione basata su alberi \textbf{B+Tree} (\textit{clustered index} sulla chiave primaria e indici secondari bilanciati).
+\end{itemize}
+
+\section{Mappatura dei Tipi di Dato e Vincoli di Dominio}
+Tutti i tipi di dato concettuali sono stati mappati sui tipi fisici ottimali:
+\begin{itemize}[noitemsep]
+    \item \textbf{Importi Economici:} Mappati su \texttt{DECIMAL(10,2)} con vincolo \texttt{CHECK (importo >= 0.00)} per evitare imprecisioni dovute all'aritmetica floating point.
+    \item \textbf{Date e Orari:} Utilizzo di \texttt{DATE} per scadenze e date di nascita, \texttt{TIME} per la regia oraria e \texttt{DATETIME} per timestamp di comunicazioni e donazioni.
+    \item \textbf{Codici Fiscali e Partite IVA:} Tipizzati rispettivamente come \texttt{VARCHAR(16)} e \texttt{VARCHAR(20)}.
+    \item \textbf{Stati Enumerati e Flag:} Implementati con stringhe vincolate da clausole \texttt{CHECK (stato IN (...))} e flag booleani \texttt{CHAR(1) CHECK (flag IN ('S', 'N'))}.
+\end{itemize}
+
+\section{Strategia di Indicizzazione (Indici Secondari B-Tree)}
+Oltre agli indici automatici associati alle Primary Key (\textit{clustered}), sono stati creati indici secondari non-clusterizzati B-Tree mirati ad ottimizzare i piani d'accesso delle operazioni più critiche:
+\begin{lstlisting}
+-- Ottimizzazione JOIN tra Preventivo ed Evento (STAT-02)
+CREATE INDEX idx_prev_evento ON PREVENTIVO (username_coppia, data_evento);
+
+-- Ottimizzazione Seating Planning e controllo capienza tavoli (OP-08, STAT-04)
+CREATE INDEX idx_part_tavolo ON PARTECIPAZIONE (username_coppia, data_evento, tavolo_nome_numero);
+
+-- Ottimizzazione calcolo aggregato donazioni lista nozze (OP-10, STAT-06)
+CREATE INDEX idx_quota_regalo_evento ON QUOTA_REGALO (username_coppia, data_evento, descrizione_regalo);
+
+-- Ottimizzazione interrogazioni per categoria merceologica fornitori (STAT-01)
+CREATE INDEX idx_forn_cat ON FORNITORE (nome_categoria, attivo);
+\end{lstlisting}
+
+\section{Implementazione dei Trigger Procedurali per Vincoli Inespressi}
+I vincoli aziendali non esprimibili dichiarativamente tramite costrutti DDL standard sono stati formalizzati a livello fisico attraverso \textbf{Trigger SQL} procedurali, con emissione di segnali diagnostici controllati (\texttt{SIGNAL SQLSTATE '45000'}):
+
+\subsection{Verifica Donatore Eleggibile nella Lista Nozze [V-02]}
+\begin{lstlisting}
+DELIMITER $$
+CREATE TRIGGER trg_quota_regalo_before_insert
+BEFORE INSERT ON QUOTA_REGALO
+FOR EACH ROW
+BEGIN
+    DECLARE v_esiste INT DEFAULT 0;
+    SELECT COUNT(*) INTO v_esiste
+    FROM PARTECIPAZIONE
+    WHERE codice_fiscale = NEW.codice_fiscale
+      AND username_coppia = NEW.username_coppia
+      AND data_evento = NEW.data_evento;
+
+    IF v_esiste = 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Violazione [V-02]: Solo un invitato regolarmente censito per questo evento puo versare una quota regalo.';
+    END IF;
+END$$
+DELIMITER ;
+\end{lstlisting}
+
+\subsection{Manutenzione Atomica della Ridondanza e Flag Completato}
+\begin{lstlisting}
+DELIMITER $$
+CREATE TRIGGER trg_quota_aggiorna_totale
+AFTER INSERT ON QUOTA_REGALO
+FOR EACH ROW
+BEGIN
+    -- 1. Aggiornamento contatore ridondante totale_raccolto in LISTA_NOZZE
+    UPDATE LISTA_NOZZE
+    SET totale_raccolto = totale_raccolto + NEW.importo
+    WHERE username_coppia = NEW.username_coppia
+      AND data_evento = NEW.data_evento;
+
+    -- 2. Aggiornamento flag ridondante completato in REGALO se raggiunto il target
+    IF NEW.descrizione_regalo IS NOT NULL THEN
+        UPDATE REGALO r
+        SET r.completato = 'S'
+        WHERE r.username_coppia = NEW.username_coppia
+          AND r.data_evento = NEW.data_evento
+          AND r.descrizione = NEW.descrizione_regalo
+          AND (
+              SELECT COALESCE(SUM(q.importo), 0.00)
+              FROM QUOTA_REGALO q
+              WHERE q.username_coppia = NEW.username_coppia
+                AND q.data_evento = NEW.data_evento
+                AND q.descrizione_regalo = NEW.descrizione_regalo
+                AND q.stato = 'confermato'
+          ) >= r.prezzo;
+    END IF;
+END$$
+DELIMITER ;
+\end{lstlisting}

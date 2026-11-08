@@ -276,9 +276,9 @@ INSERT INTO CONTRATTO (numero_preventivo, fornitore_piva, data_firma, importo_co
 -- 19. REGIA ORARIA (TIMELINE)
 -- -----------------------------------------------------------------------------
 INSERT INTO TIMELINE (username_coppia, data_evento, ora_inizio, ora_fine, stato_regia) VALUES
-('marco_elena', '2025-06-21', '15:30:00', '01:30:00', 'completata'),
+('marco_elena', '2025-06-21', '15:30:00', '23:59:00', 'completata'),
 ('luca_chiara', '2026-09-12', '10:30:00', '23:30:00', 'confermata'),
-('davide_giulia', '2025-09-20', '16:00:00', '02:00:00', 'completata');
+('davide_giulia', '2025-09-20', '16:00:00', '23:59:00', 'completata');
 
 -- -----------------------------------------------------------------------------
 -- 20. SCALETTA ATTIVITA (ATTIVITA_TIMELINE)

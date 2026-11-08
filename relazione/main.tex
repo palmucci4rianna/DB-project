@@ -1,0 +1,124 @@
+\documentclass[11pt,a4paper,titlepage]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{geometry}
+\geometry{a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[hidelinks]{hyperref}
+
+% Palette Colori per Codice e Tabelle
+\definecolor{dkgreen}{rgb}{0,0.5,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+\definecolor{uniboRed}{rgb}{0.73,0.08,0.11}
+\definecolor{codebg}{rgb}{0.97,0.97,0.98}
+\definecolor{headerblue}{rgb}{0.12,0.24,0.38}
+
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\footnotesize\ttfamily,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\color{dkgreen},
+  frame=lines,
+  keywordstyle=\color{uniboRed}\bfseries,
+  numbers=left,
+  numbersep=6pt,
+  numberstyle=\tiny\color{gray},
+  rulecolor=\color{gray!30},
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  stringstyle=\color{mauve},
+  tabsize=2,
+  language=SQL
+}
+
+% Stile Intestazione e Piè di Pagina
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\nouppercase{\leftmark}}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\begin{document}
+
+% ==============================================================================
+% FRONTESPIZIO
+% ==============================================================================
+\begin{titlepage}
+    \centering
+    {\scshape\Large Alma Mater Studiorum -- Università di Bologna \par}
+    \vspace{0.4cm}
+    {\scshape\large Scuola di Ingegneria e Architettura \par}
+    {\scshape\small Dipartimento di Informatica -- Scienza e Ingegneria (DISI) \par}
+    \vspace{1.2cm}
+    
+    % Se disponibile il logo UniBo, decommentare la riga seguente:
+    % \includegraphics[width=0.25\textwidth]{logo_unibo.png}
+    \vspace{1.5cm}
+    
+    {\Large\bfseries CORSO DI BASI DI DATI\par}
+    \vspace{0.4cm}
+    {\Large Progetto Finale di Laboratorio: Sistema Informativo e Gestionale per Agenzia di Wedding Planning \par}
+    \vspace{0.8cm}
+    {\huge\bfseries\color{uniboRed} Wedding Planner Studio \par}
+    {\large\itshape Progettazione Concettuale, Logica, Fisica e Realizzazione dell'Applicazione Software Desktop \par}
+    
+    \vspace{2.2cm}
+    
+    \begin{minipage}{0.48\textwidth}
+        \begin{flushleft} \large
+            \textbf{Docenti:}\\
+            Prof. Dario \textsc{Maio}\\
+            Prof.ssa Antonella \textsc{Franco}
+        \end{flushleft}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\textwidth}
+        \begin{flushright} \large
+            \textbf{Candidati:}\\
+            Arianna \textsc{Palmucci} \\
+            Matricola: 0001072609 \\
+            (Gruppo di Progetto)
+        \end{flushright}
+    \end{minipage}
+    
+    \vfill
+    {\large Anno Accademico 2025/2026 \par}
+\end{titlepage}
+
+% ==============================================================================
+% SOMMARIO E INDICE
+% ==============================================================================
+\pagenumbering{roman}
+\tableofcontents
+\newpage
+\pagenumbering{arabic}
+
+% ==============================================================================
+% CAPITOLI
+% ==============================================================================
+\input{capitolo1_requisiti.tex}
+\input{capitolo2_concettuale.tex}
+\input{capitolo3_logico.tex}
+\input{capitolo4_fisico.tex}
+\input{capitolo5_applicazione.tex}
+\input{capitolo6_conclusioni.tex}
+
+\end{document}
