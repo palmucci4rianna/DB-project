@@ -308,3 +308,50 @@ dall'esempio `VOLS.LUN`, ne cancella lo schema e poi corregge il nome del proget
 - **Orari:** DB-Main non ha un tipo "time", quindi orari e date-ora usano il tipo data.
 - **Attenzione alle chiavi naturali a cascata:** la chiave di EVENTO è (CF_coniuge1, CF_coniuge2, data) e si propaga a
   PARTECIPAZIONE, TAVOLO, REGALO, ATTIVITA_*, … Nel logico vanno valutati i costi (chiavi esterne di 3-4 colonne).
+
+---
+
+## [TMP] Avvio dell'app e database in Docker (da spostare nel posto giusto)
+
+### Avvio rapido
+```bash
+./avvia.sh            # avvia il DB (la prima volta lo crea e lo popola) + l'app
+./avvia.sh --reset    # cancella e ricarica schema e dati (sql/ddl.sql + sql/dml.sql), poi avvia l'app
+./avvia.sh --solo-db  # solo il database
+./avvia.sh --stop     # spegne il database
+```
+Serve solo Docker attivo (non bisogna installare MySQL). L'app si avvia anche da sola con `./gradlew run`,
+ma il DB deve essere già acceso.
+
+### Come funziona
+- MySQL 8 gira in un container Docker chiamato `wedding-mysql` (immagine `mysql:8`), esposto su `localhost:3306`.
+- Credenziali: utente `root`, password `root`, database `wedding_planner`. Sono una delle coppie che
+  `DAOUtils.getWeddingPlannerConnection()` prova in ordine (`root`/"", `ariannapalmucci`/`12345678`, `root`/`root`),
+  quindi il codice non va toccato. **Non mettere nel codice password personali**: il file è nel repo.
+- Lo schema di riferimento per MySQL è `sql/ddl.sql`, i dati di esempio sono in `sql/dml.sql`.
+  `schema.sql` (nella root) è la versione per DB-MAIN in SQL standard e **non** è compatibile con `dml.sql`.
+- I dati restano nel container anche dopo `docker stop` o un riavvio del PC; si perdono solo con `docker rm`.
+  Dopo un riavvio basta rilanciare `./avvia.sh`.
+- Se sul sistema è installato anche MySQL/MariaDB, va in conflitto sulla porta 3306: ne deve girare uno alla volta.
+
+### Comandi Docker utili
+| Comando | Cosa fa |
+|---|---|
+| `docker ps -a` | lista dei container (accesi e spenti) |
+| `docker start wedding-mysql` / `docker stop wedding-mysql` | accende / spegne il DB |
+| `docker rm -f wedding-mysql` | cancella il container, **dati compresi** |
+| `docker logs wedding-mysql` | log di MySQL, utile in caso di errori |
+| `docker exec -it wedding-mysql mysql -uroot -proot wedding_planner` | console MySQL interattiva |
+| `docker exec -i wedding-mysql mysql -uroot -proot wedding_planner < file.sql` | esegue un file `.sql` |
+
+### Regola MySQL 8 da ricordare (errore 3823)
+MySQL 8 non permette che una colonna usata in un vincolo `CHECK` faccia parte di una foreign key con
+`ON UPDATE CASCADE` (o `ON DELETE SET NULL` / `SET DEFAULT`). `ON DELETE CASCADE` e `RESTRICT` vanno bene.
+In `sql/ddl.sql` le 5 FK in conflitto (cercare `FIX MySQL 8`) usano `ON UPDATE RESTRICT`:
+`fk_coppia_coniuge1`, `fk_coppia_coniuge2`, `fk_ac_checklist`, `fk_part_tavolo`, `fk_app_assenza`.
+Conseguenza: non si può cambiare un codice fiscale o la data di un evento finché è usato in quelle tabelle
+(sono chiavi naturali, quindi non dovrebbero cambiare). Da citare nella progettazione fisica / relazione.
+
+### Gradle
+- In `gradle.properties` non va messo `org.gradle.java.home`: è un percorso specifico di una macchina
+  e rompe la build sulle altre. Java 21 viene scelto dalla toolchain in `app/build.gradle.kts`.

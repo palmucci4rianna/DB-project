@@ -5,6 +5,20 @@
 -- Autore: Progetto Basi di Dati - Università di Bologna (Prof. D. Maio, Prof.ssa A. Franco)
 -- Caratteristiche: Normalizzazione 3NF/BCNF, Chiavi Naturali, Indici B-Tree, Trigger
 -- =============================================================================
+--
+-- NOTA COMPATIBILITA' MySQL 8 (errore 3823)
+-- MySQL 8 NON permette che una colonna usata in un vincolo CHECK faccia parte
+-- di una foreign key con azione referenziale ON UPDATE CASCADE (né SET NULL /
+-- SET DEFAULT). ON DELETE CASCADE e RESTRICT invece sono ammessi.
+--   Errore originale: "Column 'cf_coniuge1' cannot be used in a check constraint
+--   'chk_coppia_due_coniugi_distinti': needed in a foreign key constraint
+--   'fk_coppia_coniuge1' referential action."
+-- Soluzione adottata: sulle 5 FK coinvolte (cercare "FIX MySQL 8") si usa
+-- ON UPDATE RESTRICT al posto di ON UPDATE CASCADE, mantenendo i CHECK.
+-- Conseguenza: non si può modificare la chiave riferita (es. il codice fiscale
+-- di una persona o la data di un evento) finché esistono righe che la usano
+-- in quelle tabelle. Accettabile: sono chiavi naturali che non dovrebbero cambiare.
+-- =============================================================================
 
 DROP DATABASE IF EXISTS wedding_planner;
 CREATE DATABASE wedding_planner
@@ -39,10 +53,12 @@ CREATE TABLE COPPIA (
     data_prevista       DATE            NOT NULL,
     budget_indicativo   DECIMAL(10,2)   NOT NULL,
     CONSTRAINT pk_coppia PRIMARY KEY (username),
-    CONSTRAINT fk_coppia_coniuge1 FOREIGN KEY (cf_coniuge1) 
-        REFERENCES PERSONA (codice_fiscale) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT fk_coppia_coniuge2 FOREIGN KEY (cf_coniuge2) 
-        REFERENCES PERSONA (codice_fiscale) ON DELETE RESTRICT ON UPDATE CASCADE,
+    -- FIX MySQL 8: era ON UPDATE CASCADE, in conflitto con chk_coppia_due_coniugi_distinti
+    CONSTRAINT fk_coppia_coniuge1 FOREIGN KEY (cf_coniuge1)
+        REFERENCES PERSONA (codice_fiscale) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    -- FIX MySQL 8: era ON UPDATE CASCADE, in conflitto con chk_coppia_due_coniugi_distinti
+    CONSTRAINT fk_coppia_coniuge2 FOREIGN KEY (cf_coniuge2)
+        REFERENCES PERSONA (codice_fiscale) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT chk_coppia_due_coniugi_distinti CHECK (cf_coniuge1 <> cf_coniuge2),
     CONSTRAINT chk_coppia_budget_positivo CHECK (budget_indicativo > 0)
 ) ENGINE=InnoDB;
@@ -348,8 +364,9 @@ CREATE TABLE ATTIVITA_CHECKLIST (
     note                VARCHAR(255)    NULL,
     dipendente_cf       VARCHAR(16)     NOT NULL,
     CONSTRAINT pk_attivita_checklist PRIMARY KEY (username_coppia, data_evento, codice_attivita),
-    CONSTRAINT fk_ac_checklist FOREIGN KEY (username_coppia, data_evento) 
-        REFERENCES CHECKLIST (username_coppia, data_evento) ON DELETE CASCADE ON UPDATE CASCADE,
+    -- FIX MySQL 8: era ON UPDATE CASCADE, in conflitto con chk_ac_scadenza (usa data_evento)
+    CONSTRAINT fk_ac_checklist FOREIGN KEY (username_coppia, data_evento)
+        REFERENCES CHECKLIST (username_coppia, data_evento) ON DELETE CASCADE ON UPDATE RESTRICT,
     CONSTRAINT fk_ac_dipendente FOREIGN KEY (dipendente_cf) 
         REFERENCES DIPENDENTE (codice_fiscale) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT chk_ac_stato CHECK (stato IN ('da_iniziare', 'in_corso', 'completata', 'annullata')),
@@ -416,8 +433,9 @@ CREATE TABLE PARTECIPAZIONE (
         REFERENCES INVITATO (codice_fiscale) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_part_evento FOREIGN KEY (username_coppia, data_evento) 
         REFERENCES EVENTO (username_coppia, data) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT fk_part_tavolo FOREIGN KEY (username_coppia, data_evento, tavolo_nome_numero) 
-        REFERENCES TAVOLO (username_coppia, data_evento, nome_numero) ON DELETE RESTRICT ON UPDATE CASCADE,
+    -- FIX MySQL 8: era ON UPDATE CASCADE, in conflitto con chk_part_tavolo_stato (usa tavolo_nome_numero)
+    CONSTRAINT fk_part_tavolo FOREIGN KEY (username_coppia, data_evento, tavolo_nome_numero)
+        REFERENCES TAVOLO (username_coppia, data_evento, nome_numero) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT chk_part_stato CHECK (stato IN ('CONFERMATO', 'RIFIUTATO', 'IN_ATTESA')),
     CONSTRAINT chk_part_tavolo_stato CHECK (tavolo_nome_numero IS NULL OR stato = 'CONFERMATO')
 ) ENGINE=InnoDB;
@@ -474,8 +492,9 @@ CREATE TABLE APPUNTAMENTO (
         REFERENCES COPPIA (username) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_app_dipendente FOREIGN KEY (dipendente_cf) 
         REFERENCES DIPENDENTE (codice_fiscale) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT fk_app_assenza FOREIGN KEY (categoria_assenza) 
-        REFERENCES MOTIVO_ASSENZA (categoria) ON DELETE RESTRICT ON UPDATE CASCADE,
+    -- FIX MySQL 8: era ON UPDATE CASCADE, in conflitto con chk_app_assenza (usa categoria_assenza)
+    CONSTRAINT fk_app_assenza FOREIGN KEY (categoria_assenza)
+        REFERENCES MOTIVO_ASSENZA (categoria) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT chk_app_stato CHECK (stato IN ('confermato', 'svolto', 'annullato', 'riprogrammato')),
     CONSTRAINT chk_app_assenza CHECK (stato <> 'annullato' OR categoria_assenza IS NOT NULL),
     CONSTRAINT chk_app_durata CHECK (durata > 0)
